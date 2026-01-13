@@ -48,6 +48,14 @@ app.*.map.json
 node_modules/
 **/node_modules/
 
+# Large binary files
+*.exe
+*.dll
+*.so
+*.dylib
+**/bin/**
+**/dist/**
+
 # Environment files
 .env
 .env.local
