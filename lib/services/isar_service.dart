@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
-import '../models/isar_models.dart';
+import '../models/isar_models.dart' as isar_models;
 import '../models/room.dart';
 import '../models/card.dart';
 import '../models/player.dart';
@@ -20,12 +20,12 @@ class IsarService {
 
     final dir = await getApplicationDocumentsDirectory();
     _isar = await Isar.open([
-      GameStateSnapshotSchema,
-      DiscardPileCardSchema,
-      PlayerSnapshotSchema,
-      PlayerHandSchema,
-      GameEventSchema,
-      SyncMetadataSchema,
+      isar_models.GameStateSnapshotSchema,
+      isar_models.DiscardPileCardSchema,
+      isar_models.PlayerSnapshotSchema,
+      isar_models.PlayerHandSchema,
+      isar_models.GameEventSchema,
+      isar_models.SyncMetadataSchema,
     ], directory: dir.path);
   }
 
@@ -111,7 +111,7 @@ class IsarService {
           (h) => h.playerId == ps.playerId,
           orElse:
               () =>
-                  PlayerHand()
+                  isar_models.PlayerHand()
                     ..playerId = ps.playerId
                     ..roomCode = roomCode
                     ..cardData = []
@@ -146,26 +146,34 @@ class IsarService {
         );
       }
 
-      final gameState = GameState(
-        drawPile: List.filled(
-          snapshot.drawPileCount,
-          UnoCard(color: CardColor.wild, type: CardType.wild),
-        ),
-        discardPile: discardCards,
-        activeColor: CardColor.values.firstWhere(
-          (e) => e.name == snapshot.activeColor,
-          orElse: () => CardColor.red,
-        ),
-        currentTurnPlayerId: snapshot.currentTurnPlayerId,
-        direction: snapshot.direction,
-        pendingDrawCount: snapshot.pendingDrawCount,
-        unoCalled: {},
-        stateVersion: snapshot.stateVersion,
-        lastActivity: snapshot.lastUpdated,
-        winnerPlayerId: snapshot.winnerPlayerId,
-        winnerTimestamp: snapshot.winnerTimestamp,
-        lastPlayedCardAnimationId: snapshot.lastPlayedCardAnimationId,
+      final roomStatus = RoomStatus.values.firstWhere(
+        (e) => e.name == snapshot.roomStatus,
+        orElse: () => RoomStatus.lobby,
       );
+
+      GameState? gameState;
+      if (roomStatus == RoomStatus.playing) {
+        gameState = GameState(
+          drawPile: List.filled(
+            snapshot.drawPileCount,
+            UnoCard(color: CardColor.wild, type: CardType.wild),
+          ),
+          discardPile: discardCards,
+          activeColor: CardColor.values.firstWhere(
+            (e) => e.name == snapshot.activeColor,
+            orElse: () => CardColor.red,
+          ),
+          currentTurnPlayerId: snapshot.currentTurnPlayerId,
+          direction: snapshot.direction,
+          pendingDrawCount: snapshot.pendingDrawCount,
+          unoCalled: {},
+          stateVersion: snapshot.stateVersion,
+          lastActivity: snapshot.lastUpdated,
+          winnerPlayerId: snapshot.winnerPlayerId,
+          winnerTimestamp: snapshot.winnerTimestamp,
+          lastPlayedCardAnimationId: snapshot.lastPlayedCardAnimationId,
+        );
+      }
 
       return Room(
         code: roomCode,
@@ -173,7 +181,7 @@ class IsarService {
             playerList
                 .firstWhere((p) => p.isHost, orElse: () => playerList.first)
                 .id,
-        status: RoomStatus.playing,
+        status: roomStatus,
         gameState: gameState,
         players: playerList,
         lastActivity: snapshot.lastUpdated,
@@ -188,6 +196,21 @@ class IsarService {
     bool isOptimistic = false,
   }) async {
     try {
+      // Process control events first - they bypass version checks
+      if (room.events != null && room.events!.isNotEmpty) {
+        final controlEvents = room.events!.where((e) => e.isControlEvent).toList();
+        if (controlEvents.isNotEmpty) {
+          for (final event in controlEvents) {
+            if (event.type == GameEventType.roomDeleted) {
+              await clearRoomData(room.code);
+              return true;
+            } else if (event.type == GameEventType.forceResync) {
+              await markNeedsFullSync(room.code);
+            }
+          }
+        }
+      }
+
       final metadata =
           await instance.syncMetadatas
               .filter()
@@ -197,13 +220,15 @@ class IsarService {
       final currentVersion = metadata?.lastAppliedStateVersion ?? 0;
       final incomingVersion = room.gameState?.stateVersion ?? 0;
 
-      if (incomingVersion < currentVersion && !isOptimistic) {
+      // Control events bypass version checks, but regular updates don't
+      final hasControlEvents = room.events?.any((e) => e.isControlEvent) ?? false;
+      if (incomingVersion < currentVersion && !isOptimistic && !hasControlEvents) {
         return false;
       }
 
       await instance.writeTxn(() async {
         final snapshot =
-            GameStateSnapshot()
+            isar_models.GameStateSnapshot()
               ..roomCode = room.code
               ..stateVersion = incomingVersion
               ..currentTurnPlayerId = room.gameState?.currentTurnPlayerId
@@ -215,7 +240,8 @@ class IsarService {
               ..winnerPlayerId = room.gameState?.winnerPlayerId
               ..winnerTimestamp = room.gameState?.winnerTimestamp
               ..lastPlayedCardAnimationId =
-                  room.gameState?.lastPlayedCardAnimationId;
+                  room.gameState?.lastPlayedCardAnimationId
+              ..roomStatus = room.status.name;
 
         await instance.gameStateSnapshots.put(snapshot);
 
@@ -227,7 +253,7 @@ class IsarService {
         if (room.gameState != null) {
           final discardCards =
               room.gameState!.discardPile.asMap().entries.map((e) {
-                return DiscardPileCard()
+                return isar_models.DiscardPileCard()
                   ..roomCode = room.code
                   ..cardIndex = e.key
                   ..color = e.value.color.name
@@ -241,7 +267,7 @@ class IsarService {
 
         for (final player in room.players) {
           final ps =
-              PlayerSnapshot()
+              isar_models.PlayerSnapshot()
                 ..roomCode = room.code
                 ..playerId = player.id
                 ..name = player.name
@@ -254,7 +280,7 @@ class IsarService {
           await instance.playerSnapshots.put(ps);
 
           final hand =
-              PlayerHand()
+              isar_models.PlayerHand()
                 ..playerId = player.id
                 ..roomCode = room.code
                 ..cardData =
@@ -265,7 +291,7 @@ class IsarService {
         }
 
         final syncMeta =
-            SyncMetadata()
+            isar_models.SyncMetadata()
               ..roomCode = room.code
               ..lastAppliedStateVersion = incomingVersion
               ..lastSyncAt = DateTime.now()
@@ -296,7 +322,7 @@ class IsarService {
   }) async {
     try {
       final event =
-          GameEvent()
+          isar_models.GameEvent()
             ..eventId = eventId
             ..roomCode = roomCode
             ..stateVersion = stateVersion
@@ -311,7 +337,7 @@ class IsarService {
     } catch (e) {}
   }
 
-  static Future<List<GameEvent>> getUnappliedEvents(String roomCode) async {
+  static Future<List<isar_models.GameEvent>> getUnappliedEvents(String roomCode) async {
     try {
       return await instance.gameEvents
           .filter()
@@ -393,7 +419,7 @@ class IsarService {
         await instance.syncMetadatas.put(metadata);
       } else {
         final newMeta =
-            SyncMetadata()
+            isar_models.SyncMetadata()
               ..roomCode = roomCode
               ..lastAppliedStateVersion = 0
               ..lastSyncAt = DateTime.now()

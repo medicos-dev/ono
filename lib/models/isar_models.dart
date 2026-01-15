@@ -32,6 +32,8 @@ class GameStateSnapshot {
   DateTime? winnerTimestamp;
 
   String? lastPlayedCardAnimationId;
+
+  late String roomStatus; // 'lobby', 'playing', or 'finished'
 }
 
 @collection

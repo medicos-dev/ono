@@ -143,6 +143,65 @@ class GameState {
   }
 }
 
+enum GameEventType {
+  cardPlayed,
+  cardDrawn,
+  turnAdvanced,
+  unoCalled,
+  wildColorChosen,
+  winnerDeclared,
+  animationEvent,
+  playerJoined,
+  playerLeft,
+  hostChanged,
+  roomDeleted,
+  forceResync;
+
+  String get name => toString().split('.').last.toUpperCase();
+  
+  static GameEventType? fromString(String value) {
+    try {
+      return GameEventType.values.firstWhere(
+        (e) => e.name == value.toUpperCase(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class GameEvent {
+  final GameEventType type;
+  final String? playerId;
+  final Map<String, dynamic>? data;
+  final DateTime timestamp;
+  final String eventId;
+
+  GameEvent({
+    required this.type,
+    this.playerId,
+    this.data,
+    required this.timestamp,
+    required this.eventId,
+  });
+
+  factory GameEvent.fromJson(Map<String, dynamic> json) {
+    return GameEvent(
+      type: GameEventType.fromString(json['type'] as String) ?? GameEventType.animationEvent,
+      playerId: json['playerId'] as String?,
+      data: json['data'] != null ? Map<String, dynamic>.from(json['data'] as Map) : null,
+      timestamp: DateTime.parse(json['timestamp'] as String),
+      eventId: json['eventId'] as String,
+    );
+  }
+
+  bool get isControlEvent => [
+    GameEventType.roomDeleted,
+    GameEventType.hostChanged,
+    GameEventType.forceResync,
+  ].contains(type);
+}
+
 class Room {
   final String code;
   final String hostId;
@@ -150,6 +209,7 @@ class Room {
   final GameState? gameState;
   final List<Player> players;
   final DateTime lastActivity;
+  final List<GameEvent>? events;
 
   Room({
     required this.code,
@@ -158,6 +218,7 @@ class Room {
     this.gameState,
     required this.players,
     required this.lastActivity,
+    this.events,
   });
 
   Player? get host => players.firstWhere((p) => p.id == hostId, orElse: () => players.first);
@@ -170,6 +231,13 @@ class Room {
       'gameState': gameState?.toJson(),
       'players': players.map((p) => p.toJson()).toList(),
       'lastActivity': lastActivity.toIso8601String(),
+      'events': events?.map((e) => {
+        'type': e.type.name,
+        'playerId': e.playerId,
+        'data': e.data,
+        'timestamp': e.timestamp.toIso8601String(),
+        'eventId': e.eventId,
+      }).toList(),
     };
   }
 
@@ -184,10 +252,15 @@ class Room {
       gameState: json['gameState'] != null
           ? GameState.fromJson(json['gameState'] as Map<String, dynamic>)
           : null,
-      players: (json['players'] as List<dynamic>)
-          .map((p) => Player.fromJson(p as Map<String, dynamic>))
-          .toList(),
+      players: (json['players'] as List<dynamic>?)
+          ?.map((p) => Player.fromJson(p as Map<String, dynamic>))
+          .toList() ?? [],
       lastActivity: DateTime.parse(json['lastActivity'] as String),
+      events: json['events'] != null
+          ? (json['events'] as List<dynamic>)
+              .map((e) => GameEvent.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
     );
   }
 }

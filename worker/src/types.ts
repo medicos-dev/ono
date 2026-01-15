@@ -50,6 +50,9 @@ export enum GameEventType {
   ANIMATION_EVENT = 'ANIMATION_EVENT',
   PLAYER_JOINED = 'PLAYER_JOINED',
   PLAYER_LEFT = 'PLAYER_LEFT',
+  HOST_CHANGED = 'HOST_CHANGED',
+  ROOM_DELETED = 'ROOM_DELETED',
+  FORCE_RESYNC = 'FORCE_RESYNC',
 }
 
 export interface GameEvent {
@@ -85,4 +88,5 @@ export interface Room {
   gameState: GameState | null;
   players: Player[];
   lastActivity: string;
+  events?: GameEvent[];
 }

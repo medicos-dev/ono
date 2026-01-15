@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/room_provider.dart';
 import '../services/voice_service.dart';
 import '../widgets/app_toast.dart';
+import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'game_screen.dart';
 
@@ -199,14 +200,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
           ),
           body: Container(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF0A0A0F),
-                  Color(0xFF151520),
-                ],
-              ),
+              color: AppTheme.darkBackground,
             ),
             child: SafeArea(
               child: Column(
@@ -214,21 +208,42 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 6,
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Room Code',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              room.code,
-                              style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                    color: const Color(0xFF00E5FF),
-                                    letterSpacing: 4,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  room.code,
+                                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                        color: AppTheme.neonBlue,
+                                        letterSpacing: 4,
+                                      ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.darkSurface,
+                                    borderRadius: BorderRadius.circular(999),
                                   ),
+                                  child: Text(
+                                    '${room.players.length} player${room.players.length == 1 ? '' : 's'}',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -241,64 +256,39 @@ class _LobbyScreenState extends State<LobbyScreen> {
                       itemCount: room.players.length,
                       itemBuilder: (context, index) {
                         final player = room.players[index];
+                        final isHost = player.isHost;
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
+                            color: AppTheme.darkSurface,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: player.isHost
-                                  ? const Color(0xFFFFEA00).withOpacity(0.5)
-                                  : Colors.white.withOpacity(0.1),
-                              width: player.isHost ? 2 : 1,
+                              color: isHost ? AppTheme.neonYellow.withOpacity(0.7) : Colors.white.withOpacity(0.06),
+                              width: isHost ? 1.5 : 1,
                             ),
-                            boxShadow: player.isHost
-                                ? [
-                                    BoxShadow(
-                                      color: const Color(0xFFFFEA00).withOpacity(0.3),
-                                      blurRadius: 8,
-                                      spreadRadius: 1,
-                                    ),
-                                  ]
-                                : null,
                           ),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
-                              vertical: 8,
+                              vertical: 10,
                             ),
                             leading: Container(
-                              width: 50,
-                              height: 50,
+                              width: 48,
+                              height: 48,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: player.isHost
-                                      ? [
-                                          const Color(0xFFFFEA00),
-                                          const Color(0xFFFFB300),
-                                        ]
-                                      : [
-                                          Colors.blue.withOpacity(0.6),
-                                          Colors.purple.withOpacity(0.6),
-                                        ],
+                                color: isHost ? AppTheme.neonYellow.withOpacity(0.18) : Colors.white.withOpacity(0.06),
+                                border: Border.all(
+                                  color: isHost ? AppTheme.neonYellow : AppTheme.neonBlue.withOpacity(0.6),
+                                  width: 1.5,
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
                               ),
                               child: Center(
                                 child: Text(
-                                  player.name.isNotEmpty
-                                      ? player.name[0].toUpperCase()
-                                      : '?',
+                                  player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 20,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -306,44 +296,41 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             ),
                             title: Text(
                               player.name,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            subtitle: player.isHost
-                                ? Container(
-                                    margin: const EdgeInsets.only(top: 4),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xFFFFEA00),
-                                          Color(0xFFFFB300),
-                                        ],
+                            subtitle: isHost
+                                ? Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
                                       ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text(
-                                      'HOST',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                        letterSpacing: 1,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.neonYellow.withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: const Text(
+                                        'HOST',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                          letterSpacing: 1,
+                                        ),
                                       ),
                                     ),
                                   )
                                 : null,
-                            trailing: player.isHost
-                                ? const Icon(
-                                    Icons.star,
-                                    color: Color(0xFFFFEA00),
-                                    size: 24,
+                            trailing: isHost
+                                ? Icon(
+                                    Icons.star_rounded,
+                                    color: AppTheme.neonYellow,
+                                    size: 22,
                                   )
                                 : null,
                           ),
@@ -372,15 +359,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
                             child: Container(
                               height: 60,
                               decoration: BoxDecoration(
-                                color: _isMicPressed
-                                    ? const Color(0xFFFF1744)
-                                    : const Color(0xFF00E5FF),
+                                color: _isMicPressed ? AppTheme.neonRed : AppTheme.neonBlue,
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 _isMicPressed ? Icons.mic : Icons.mic_none,
                                 color: Colors.white,
-                                size: 30,
+                                size: 26,
                               ),
                             ),
                           ),

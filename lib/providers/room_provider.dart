@@ -10,6 +10,7 @@ import '../models/isar_models.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/isar_service.dart';
+import '../services/voice_service.dart';
 
 class RoomProvider with ChangeNotifier {
   Room? _room;
@@ -49,6 +50,8 @@ class RoomProvider with ChangeNotifier {
       if (_apiService.baseUrl == null || _apiService.baseUrl!.isEmpty) {
         throw Exception('API base URL not initialized. Please check your .env file and restart the app.');
       }
+      // Clear any stale cache for this room
+      await IsarService.clearRoomData(roomCode.toUpperCase());
       final room = await _apiService.createRoom(playerName, playerId, roomCode);
       await IsarService.writeRoomSnapshot(room);
       _room = await IsarService.getCachedRoom(room.code);
@@ -75,15 +78,8 @@ class RoomProvider with ChangeNotifier {
         throw Exception('API base URL not initialized. Please check your .env file and restart the app.');
       }
       
-      final cachedRoom = await IsarService.getCachedRoom(roomCode.toUpperCase());
-      if (cachedRoom != null) {
-        _room = cachedRoom;
-        _currentPlayer = _room!.players.firstWhere(
-          (p) => p.id == playerId,
-          orElse: () => _room!.players.first,
-        );
-        notifyListeners();
-      }
+      // Clear any stale cache for this room before joining
+      await IsarService.clearRoomData(roomCode.toUpperCase());
       
       final room = await _apiService.joinRoom(roomCode.toUpperCase(), playerName, playerId);
       await IsarService.writeRoomSnapshot(room);
@@ -223,8 +219,9 @@ class RoomProvider with ChangeNotifier {
         final newVersion = updatedRoom.gameState?.stateVersion ?? 0;
         final playersChanged = updatedRoom.players.length != _room!.players.length;
         final statusChanged = updatedRoom.status != _room!.status;
+        final hasEvents = updatedRoom.events != null && updatedRoom.events!.isNotEmpty;
         
-        if (newVersion > lastVersion || playersChanged || statusChanged) {
+        if (newVersion > lastVersion || playersChanged || statusChanged || hasEvents) {
           await IsarService.writeRoomSnapshot(updatedRoom);
           final cachedRoom = await IsarService.getCachedRoom(updatedRoom.code);
           if (cachedRoom != null) {
@@ -235,25 +232,22 @@ class RoomProvider with ChangeNotifier {
                 orElse: () => _currentPlayer!,
               );
             }
-            if (newVersion > _lastNotifiedVersion || playersChanged || statusChanged) {
+            if (newVersion > _lastNotifiedVersion || playersChanged || statusChanged || hasEvents) {
               _lastNotifiedVersion = newVersion;
               notifyListeners();
             }
           }
         }
       }
+    } on RoomDeletedException catch (e) {
+      await _handleRoomDeleted(e.reason);
     } catch (e) {
       final errorMessage = e.toString().toLowerCase();
       if (errorMessage.contains('room not found') || 
           errorMessage.contains('not found') ||
-          errorMessage.contains('404')) {
-        stopPolling();
-        _stopHeartbeat();
-        _isarSubscription?.cancel();
-        _isarSubscription = null;
-        _room = null;
-        _currentPlayer = null;
-        notifyListeners();
+          errorMessage.contains('404') ||
+          errorMessage.contains('room deleted')) {
+        await _handleRoomDeleted('NOT_FOUND');
         return;
       }
     }
@@ -287,9 +281,33 @@ class RoomProvider with ChangeNotifier {
           notifyListeners();
         }
       }
+    } on RoomDeletedException catch (e) {
+      await _handleRoomDeleted(e.reason);
     } catch (e) {
       await IsarService.markNeedsFullSync(_room!.code);
     }
+  }
+
+  Future<void> _handleRoomDeleted(String reason) async {
+    final roomCode = _room?.code;
+    
+    stopPolling();
+    _stopHeartbeat();
+    _isarSubscription?.cancel();
+    _isarSubscription = null;
+    
+    if (roomCode != null) {
+      await VoiceService.leaveRoom();
+      await IsarService.clearRoomData(roomCode);
+      await StorageService.clearRoomCode();
+    }
+    
+    _room = null;
+    _currentPlayer = null;
+    _error = reason == 'HOST_LEFT' 
+        ? 'Host left the room. Returning to home.'
+        : 'Room was deleted. Returning to home.';
+    notifyListeners();
   }
 
   void _startPolling() {

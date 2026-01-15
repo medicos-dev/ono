@@ -3,6 +3,16 @@ import 'package:http/http.dart' as http;
 import '../models/room.dart';
 import '../models/card.dart';
 
+class RoomDeletedException implements Exception {
+  final String reason;
+  final List<GameEvent> events;
+
+  RoomDeletedException({required this.reason, required this.events});
+
+  @override
+  String toString() => 'Room deleted: $reason';
+}
+
 class ApiService {
   String? baseUrl;
 
@@ -213,14 +223,6 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 20));
 
-      if (response.statusCode == 404) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
-        if (body['error'] == 'Room not found') {
-          throw Exception('Room not found');
-        }
-        return null;
-      }
-
       if (response.statusCode == 304 || response.statusCode != 200) {
         return null;
       }
@@ -231,12 +233,27 @@ class ApiService {
         return null;
       }
 
+      // Check for ROOM_DELETED event
+      if (body['type'] == 'ROOM_DELETED') {
+        throw RoomDeletedException(
+          reason: body['reason'] as String? ?? 'UNKNOWN',
+          events: body['events'] != null
+              ? (body['events'] as List<dynamic>)
+                  .map((e) => GameEvent.fromJson(e as Map<String, dynamic>))
+                  .toList()
+              : [],
+        );
+      }
+
       if (body.containsKey('error') && body['error'] == 'Room not found') {
-        throw Exception('Room not found');
+        throw RoomDeletedException(reason: 'NOT_FOUND', events: []);
       }
 
       return Room.fromJson(body);
     } catch (e) {
+      if (e is RoomDeletedException) {
+        rethrow;
+      }
       return null;
     }
   }

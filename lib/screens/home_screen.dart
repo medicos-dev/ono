@@ -196,13 +196,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF00E5FF).withOpacity(0.3),
-                              blurRadius: 40,
-                              spreadRadius: 5,
-                            ),
-                          ],
+                          color: Colors.white.withOpacity(0.03),
+                          border: Border.all(
+                            color: const Color(0xFF00E5FF).withOpacity(0.4),
+                            width: 1.5,
+                          ),
                         ),
                         child: Image.asset(
                           'assets/ONO APP LOGO.png',
@@ -214,16 +212,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               height: 120,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    const Color(0xFF00E5FF).withOpacity(0.2),
-                                    const Color(0xFF00E5FF).withOpacity(0.05),
-                                  ],
-                                ),
+                                color: Colors.black.withOpacity(0.2),
                                 border: Border.all(
-                                  color: const Color(0xFF00E5FF).withOpacity(0.5),
+                                  color: const Color(0xFF00E5FF).withOpacity(0.6),
                                   width: 2,
                                 ),
                               ),
@@ -237,19 +228,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Color(0xFF00E5FF), Color(0xFF00B8D4)],
-                        ).createShader(bounds),
-                        child: Text(
-                          'ONO',
-                          style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 8,
-                                fontSize: 48,
-                              ),
-                        ),
+                      Text(
+                        'ONO',
+                        style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                              color: const Color(0xFF00E5FF),
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 8,
+                              fontSize: 48,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -265,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.03),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(24),
                           border: Border.all(
                             color: Colors.white.withOpacity(0.08),
                           ),
@@ -285,18 +271,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
                                 prefixIcon: Icon(Icons.person_outline, color: Colors.white.withOpacity(0.7)),
                                 filled: true,
-                                fillColor: Colors.white.withOpacity(0.05),
+                                fillColor: Colors.white.withOpacity(0.04),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(24),
                                   borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 2),
                                 ),
                               ),
@@ -322,18 +308,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
                                 prefixIcon: Icon(Icons.tag, color: Colors.white.withOpacity(0.7)),
                                 filled: true,
-                                fillColor: Colors.white.withOpacity(0.05),
+                                fillColor: Colors.white.withOpacity(0.04),
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                  borderRadius: BorderRadius.circular(24),
+                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(24),
                                   borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 2),
                                 ),
                               ),
