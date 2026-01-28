@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../providers/room_provider.dart';
 import '../providers/game_provider.dart';
-import '../services/voice_service.dart';
 import '../widgets/uno_card_widget.dart';
 import '../widgets/wild_card_animation.dart';
 import '../widgets/uno_call_overlay.dart';
@@ -56,15 +55,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (roomProvider.isPlaying) {
         await WakelockPlus.enable();
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _disableWakeLock() async {
     try {
       await WakelockPlus.disable();
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   @override
@@ -79,7 +76,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     final roomProvider = Provider.of<RoomProvider>(context, listen: false);
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       roomProvider.stopPolling();
     } else if (state == AppLifecycleState.resumed) {
       roomProvider.startPolling();
@@ -88,7 +86,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _checkRoomStatus() {
     final roomProvider = Provider.of<RoomProvider>(context, listen: false);
-    
+
     if (roomProvider.room?.status == RoomStatus.finished) {
       _handleWinner();
       return;
@@ -146,9 +144,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => DiscardPileHistoryOverlay(
-        discardPile: gameState.discardPile,
-      ),
+      builder:
+          (context) =>
+              DiscardPileHistoryOverlay(discardPile: gameState.discardPile),
     );
   }
 
@@ -196,8 +194,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Future<void> _handlePlayCard(UnoCard card) async {
     final gameProvider = Provider.of<GameProvider>(context, listen: false);
-    final currentPlayer = Provider.of<RoomProvider>(context, listen: false).currentPlayer;
-    
+    final currentPlayer =
+        Provider.of<RoomProvider>(context, listen: false).currentPlayer;
+
     if (currentPlayer?.isSpectator == true) {
       AppToast.show(
         context,
@@ -218,7 +217,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
 
     try {
-      await gameProvider.playCard(card, chosenColor: gameProvider.pendingColorChoice);
+      await gameProvider.playCard(
+        card,
+        chosenColor: gameProvider.pendingColorChoice,
+      );
     } catch (e) {
       if (mounted) {
         AppToast.show(
@@ -246,7 +248,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Future<void> _handleDrawCard() async {
     final gameProvider = Provider.of<GameProvider>(context, listen: false);
-    final currentPlayer = Provider.of<RoomProvider>(context, listen: false).currentPlayer;
+    final currentPlayer =
+        Provider.of<RoomProvider>(context, listen: false).currentPlayer;
 
     if (currentPlayer?.isSpectator == true) {
       AppToast.show(
@@ -272,7 +275,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Future<void> _handleCallUno() async {
     final gameProvider = Provider.of<GameProvider>(context, listen: false);
-    final currentPlayer = Provider.of<RoomProvider>(context, listen: false).currentPlayer;
+    final currentPlayer =
+        Provider.of<RoomProvider>(context, listen: false).currentPlayer;
 
     if (currentPlayer?.isSpectator == true) {
       AppToast.show(
@@ -298,7 +302,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   Future<void> _handlePassTurn() async {
     final gameProvider = Provider.of<GameProvider>(context, listen: false);
-    final currentPlayer = Provider.of<RoomProvider>(context, listen: false).currentPlayer;
+    final currentPlayer =
+        Provider.of<RoomProvider>(context, listen: false).currentPlayer;
 
     if (currentPlayer?.isSpectator == true) {
       AppToast.show(
@@ -325,7 +330,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void> _handleExitGame() async {
     await _disableWakeLock();
     final roomProvider = Provider.of<RoomProvider>(context, listen: false);
-    await VoiceService.leaveRoom();
     await roomProvider.leaveRoom();
 
     if (mounted) {
@@ -339,7 +343,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void> _handleReturnHome() async {
     await _disableWakeLock();
     final roomProvider = Provider.of<RoomProvider>(context, listen: false);
-    await VoiceService.leaveRoom();
     await roomProvider.leaveRoom();
 
     if (mounted) {
@@ -358,23 +361,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Leave Game?'),
-        content: const Text('Are you sure you want to leave the game?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Leave Game?'),
+            content: const Text('Are you sure you want to leave the game?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.neonRed,
+                ),
+                child: const Text('Leave'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.neonRed,
-            ),
-            child: const Text('Leave'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -385,7 +389,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Offset? _getPlayerAvatarPosition(String playerId) {
     final key = _playerAvatarKeys[playerId];
     if (key?.currentContext == null) return null;
-    final RenderBox? renderBox = key!.currentContext?.findRenderObject() as RenderBox?;
+    final RenderBox? renderBox =
+        key!.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) return null;
     return renderBox.localToGlobal(Offset.zero) +
         Offset(renderBox.size.width / 2, renderBox.size.height / 2);
@@ -453,15 +458,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF00E5FF),
+                      ),
                     ),
                     SizedBox(height: 16),
                     Text(
                       'Loading game...',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 16,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
                     ),
                   ],
                 ),
@@ -484,10 +488,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF0A0A0F),
-                        Color(0xFF151520),
-                      ],
+                      colors: [Color(0xFF0A0A0F), Color(0xFF151520)],
                     ),
                   ),
                 ),
@@ -505,16 +506,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
         final isMyTurn = gameProvider.isMyTurn && !currentPlayer.isSpectator;
         final topCard = gameState.topDiscardCard;
-        final sortedHand = List<UnoCard>.from(currentPlayer.hand)
-          ..sort((a, b) {
-            if (a.color != b.color) {
-              return a.color.index.compareTo(b.color.index);
-            }
-            if (a.type != b.type) {
-              return a.type.index.compareTo(b.type.index);
-            }
-            return (a.number ?? 0).compareTo(b.number ?? 0);
-          });
+        final sortedHand = List<UnoCard>.from(currentPlayer.hand)..sort((a, b) {
+          if (a.color != b.color) {
+            return a.color.index.compareTo(b.color.index);
+          }
+          if (a.type != b.type) {
+            return a.type.index.compareTo(b.type.index);
+          }
+          return (a.number ?? 0).compareTo(b.number ?? 0);
+        });
 
         return Scaffold(
           backgroundColor: AppTheme.darkBackground,
@@ -536,19 +536,43 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   ),
                   child: Column(
                     children: [
-                      _buildTopBar(context, room, gameState, isMyTurn, currentPlayer),
+                      _buildTopBar(
+                        context,
+                        room,
+                        gameState,
+                        isMyTurn,
+                        currentPlayer,
+                      ),
                       _buildOpponentsSection(room, gameState, roomProvider),
-                      Expanded(child: _buildGameArea(context, gameState, topCard, isMyTurn, gameProvider, currentPlayer)),
+                      Expanded(
+                        child: _buildGameArea(
+                          context,
+                          gameState,
+                          topCard,
+                          isMyTurn,
+                          gameProvider,
+                          currentPlayer,
+                        ),
+                      ),
                       if (!currentPlayer.isSpectator) ...[
-                        _buildMyHand(sortedHand, gameState, topCard, isMyTurn, gameProvider, currentPlayer),
+                        _buildMyHand(
+                          sortedHand,
+                          gameState,
+                          topCard,
+                          isMyTurn,
+                          gameProvider,
+                          currentPlayer,
+                        ),
                       ] else ...[
                         Padding(
                           padding: const EdgeInsets.all(32),
                           child: Text(
                             'You are spectating this game',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: Colors.white.withOpacity(0.5),
-                                ),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyLarge?.copyWith(
+                              color: Colors.white.withOpacity(0.5),
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -558,7 +582,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
                 if (_showWildColorPicker) _buildWildColorPicker(),
                 if (gameState.lastPlayedCardAnimationId != null &&
-                    gameState.lastPlayedCardAnimationId != _lastProcessedAnimationId)
+                    gameState.lastPlayedCardAnimationId !=
+                        _lastProcessedAnimationId)
                   ...(_buildCardFlyAnimation(room, gameState) != null
                       ? [_buildCardFlyAnimation(room, gameState)!]
                       : []),
@@ -570,7 +595,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTopBar(BuildContext context, Room room, GameState gameState, bool isMyTurn, Player currentPlayer) {
+  Widget _buildTopBar(
+    BuildContext context,
+    Room room,
+    GameState gameState,
+    bool isMyTurn,
+    Player currentPlayer,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
@@ -643,44 +674,52 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   void _showResignConfirmation(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.flag, color: Color(0xFFE94560)),
-            SizedBox(width: 12),
-            Text('Resign Game?', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to resign? Your cards will be returned to the deck and other players will be notified.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _handleReturnHome();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE94560),
+      builder:
+          (context) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text('Resign'),
+            title: const Row(
+              children: [
+                Icon(Icons.flag, color: Color(0xFFE94560)),
+                SizedBox(width: 12),
+                Text('Resign Game?', style: TextStyle(color: Colors.white)),
+              ],
+            ),
+            content: const Text(
+              'Are you sure you want to resign? Your cards will be returned to the deck and other players will be notified.',
+              style: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _handleReturnHome();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE94560),
+                ),
+                child: const Text('Resign'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
-  Widget _buildOpponentsSection(Room room, GameState gameState, RoomProvider roomProvider) {
-    final opponents = room.players.where((p) => p.id != roomProvider.currentPlayer?.id).toList();
+  Widget _buildOpponentsSection(
+    Room room,
+    GameState gameState,
+    RoomProvider roomProvider,
+  ) {
+    final opponents =
+        room.players
+            .where((p) => p.id != roomProvider.currentPlayer?.id)
+            .toList();
     final currentPlayerId = gameState.currentTurnPlayerId;
 
     if (opponents.isEmpty) {
@@ -695,10 +734,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
 
     final playerCount = opponents.length;
-    final scaleFactor = playerCount > 8 
-        ? 0.7 - ((playerCount - 8) * 0.05).clamp(0.0, 0.4)
-        : 1.0;
-    
+    final scaleFactor =
+        playerCount > 8
+            ? 0.7 - ((playerCount - 8) * 0.05).clamp(0.0, 0.4)
+            : 1.0;
+
     final avatarMargin = 6.0 * scaleFactor;
     final avatarPaddingH = 14.0 * scaleFactor;
     final avatarPaddingV = 10.0 * scaleFactor;
@@ -719,7 +759,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           final player = opponents[index];
           final isCurrentTurn = player.id == currentPlayerId;
           final hasUno = gameState.unoCalled[player.id] == true;
-          
+
           if (!_playerAvatarKeys.containsKey(player.id)) {
             _playerAvatarKeys[player.id] = GlobalKey();
           }
@@ -727,30 +767,36 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           return Container(
             key: _playerAvatarKeys[player.id],
             margin: EdgeInsets.symmetric(horizontal: avatarMargin),
-            padding: EdgeInsets.symmetric(horizontal: avatarPaddingH, vertical: avatarPaddingV),
+            padding: EdgeInsets.symmetric(
+              horizontal: avatarPaddingH,
+              vertical: avatarPaddingV,
+            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(borderRadius),
-              gradient: isCurrentTurn
-                  ? const LinearGradient(
-                      colors: [Color(0xFFE94560), Color(0xFFFF6B6B)],
-                    )
-                  : null,
+              gradient:
+                  isCurrentTurn
+                      ? const LinearGradient(
+                        colors: [Color(0xFFE94560), Color(0xFFFF6B6B)],
+                      )
+                      : null,
               color: isCurrentTurn ? null : Colors.white.withOpacity(0.1),
               border: Border.all(
-                color: isCurrentTurn
-                    ? Colors.transparent
-                    : Colors.white.withOpacity(0.2),
+                color:
+                    isCurrentTurn
+                        ? Colors.transparent
+                        : Colors.white.withOpacity(0.2),
                 width: 1 * scaleFactor,
               ),
-              boxShadow: isCurrentTurn
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFFE94560).withOpacity(0.4),
-                        blurRadius: 10 * scaleFactor,
-                        spreadRadius: 1 * scaleFactor,
-                      ),
-                    ]
-                  : null,
+              boxShadow:
+                  isCurrentTurn
+                      ? [
+                        BoxShadow(
+                          color: const Color(0xFFE94560).withOpacity(0.4),
+                          blurRadius: 10 * scaleFactor,
+                          spreadRadius: 1 * scaleFactor,
+                        ),
+                      ]
+                      : null,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -823,7 +869,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildGameArea(BuildContext context, GameState gameState, UnoCard? topCard, bool isMyTurn, GameProvider gameProvider, Player currentPlayer) {
+  Widget _buildGameArea(
+    BuildContext context,
+    GameState gameState,
+    UnoCard? topCard,
+    bool isMyTurn,
+    GameProvider gameProvider,
+    Player currentPlayer,
+  ) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -851,16 +904,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                           colors: [Color(0xFF1A1A2E), Color(0xFF0F3460)],
                         ),
                         border: Border.all(
-                          color: isMyTurn && gameProvider.canDrawCard
-                              ? const Color(0xFFE94560)
-                              : Colors.white24,
+                          color:
+                              isMyTurn && gameProvider.canDrawCard
+                                  ? const Color(0xFFE94560)
+                                  : Colors.white24,
                           width: isMyTurn && gameProvider.canDrawCard ? 2 : 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: isMyTurn && gameProvider.canDrawCard
-                                ? const Color(0xFFE94560).withOpacity(0.3)
-                                : Colors.black.withOpacity(0.3),
+                            color:
+                                isMyTurn && gameProvider.canDrawCard
+                                    ? const Color(0xFFE94560).withOpacity(0.3)
+                                    : Colors.black.withOpacity(0.3),
                             blurRadius: 15,
                             offset: const Offset(0, 5),
                           ),
@@ -947,43 +1002,44 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 onTap: () => _showDiscardPileHistory(gameState),
                 child: SizedBox(
                   key: _discardPileKey,
-                  child: topCard != null
-                      ? topCard.isWild
-                          ? WildCardAnimation(
-                              child: UnoCardWidget(
+                  child:
+                      topCard != null
+                          ? topCard.isWild
+                              ? WildCardAnimation(
+                                child: UnoCardWidget(
+                                  card: topCard,
+                                  activeColor: gameState.activeColor,
+                                  size: UnoCardSize.large,
+                                ),
+                              )
+                              : UnoCardWidget(
                                 card: topCard,
                                 activeColor: gameState.activeColor,
                                 size: UnoCardSize.large,
+                              )
+                          : Container(
+                            width: 140,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 3,
                               ),
-                            )
-                          : UnoCardWidget(
-                              card: topCard,
-                              activeColor: gameState.activeColor,
-                              size: UnoCardSize.large,
-                            )
-                      : Container(
-                          width: 140,
-                          height: 200,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                              width: 3,
+                              color: Colors.white.withOpacity(0.05),
                             ),
-                            color: Colors.white.withOpacity(0.05),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'Host\'s\nTurn',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white54,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                            child: const Center(
+                              child: Text(
+                                'Host\'s\nTurn',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                           ),
-                        ),
                 ),
               ),
             ],
@@ -1007,9 +1063,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  gameState.direction == 1
-                      ? 'Clockwise'
-                      : 'Counter-Clockwise',
+                  gameState.direction == 1 ? 'Clockwise' : 'Counter-Clockwise',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 12,
@@ -1019,7 +1073,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
-          if (topCard != null && topCard.isWild && gameState.activeColor != CardColor.wild) ...[
+          if (topCard != null &&
+              topCard.isWild &&
+              gameState.activeColor != CardColor.wild) ...[
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -1128,7 +1184,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       return const SizedBox.shrink();
     }
 
-    final hasUno = currentPlayer.cardCount == 1 && gameState.unoCalled[currentPlayer.id] != true;
+    final hasUno =
+        currentPlayer.cardCount == 1 &&
+        gameState.unoCalled[currentPlayer.id] != true;
 
     return Container(
       padding: EdgeInsets.only(
@@ -1195,33 +1253,41 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        gradient: gameProvider.canCallUno
-                            ? const LinearGradient(
-                                colors: [
-                                  Color(0xFFE53935),
-                                  Color(0xFFFF9800),
-                                  Color(0xFFFDD835),
-                                ],
-                              )
-                            : null,
-                        color: gameProvider.canCallUno
-                            ? null
-                            : Colors.grey.withOpacity(0.3),
+                        gradient:
+                            gameProvider.canCallUno
+                                ? const LinearGradient(
+                                  colors: [
+                                    Color(0xFFE53935),
+                                    Color(0xFFFF9800),
+                                    Color(0xFFFDD835),
+                                  ],
+                                )
+                                : null,
+                        color:
+                            gameProvider.canCallUno
+                                ? null
+                                : Colors.grey.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(30),
-                        boxShadow: gameProvider.canCallUno
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFFE53935).withOpacity(0.6),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                ),
-                              ]
-                            : null,
+                        boxShadow:
+                            gameProvider.canCallUno
+                                ? [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFFE53935,
+                                    ).withOpacity(0.6),
+                                    blurRadius: 15,
+                                    spreadRadius: 2,
+                                  ),
+                                ]
+                                : null,
                       ),
                       child: Text(
                         'UNO!',
                         style: TextStyle(
-                          color: gameProvider.canCallUno ? Colors.white : Colors.white38,
+                          color:
+                              gameProvider.canCallUno
+                                  ? Colors.white
+                                  : Colors.white38,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 2,
@@ -1232,20 +1298,29 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
-          if (isMyTurn && !currentPlayer.isSpectator && gameProvider.canPassTurn)
+          if (isMyTurn &&
+              !currentPlayer.isSpectator &&
+              gameProvider.canPassTurn)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: ElevatedButton.icon(
-                onPressed: gameProvider.isProcessingAction ? null : _handlePassTurn,
+                onPressed:
+                    gameProvider.isProcessingAction ? null : _handlePassTurn,
                 icon: const Icon(Icons.skip_next, size: 18),
                 label: const Text('PASS TURN'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white.withOpacity(0.1),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
+                    side: BorderSide(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1,
+                    ),
                   ),
                 ),
               ),
@@ -1260,19 +1335,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               itemBuilder: (context, index) {
                 final card = hand[index];
                 final isSelected = gameProvider.selectedCard == card;
-                final isPlayable = isMyTurn &&
+                final isPlayable =
+                    isMyTurn &&
                     topCard != null &&
                     card.canPlayOn(topCard, gameState.activeColor);
 
                 return GestureDetector(
-                  onTap: isMyTurn
-                      ? () {
-                          gameProvider.selectCard(card);
-                          if (isPlayable) {
-                            _handlePlayCard(card);
+                  onTap:
+                      isMyTurn
+                          ? () {
+                            gameProvider.selectCard(card);
+                            if (isPlayable) {
+                              _handlePlayCard(card);
+                            }
                           }
-                        }
-                      : null,
+                          : null,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: Center(
@@ -1303,7 +1380,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       ),
     );
   }
-
 
   Widget _buildWildColorPicker() {
     return GestureDetector(
@@ -1367,10 +1443,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         decoration: BoxDecoration(
           color: AppTheme.getCardColor(color),
           shape: BoxShape.circle,
-          border: Border.all(
-            color: AppTheme.neonYellow,
-            width: 3,
-          ),
+          border: Border.all(color: AppTheme.neonYellow, width: 3),
         ),
       ),
     );

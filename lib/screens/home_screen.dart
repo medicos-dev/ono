@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/room_provider.dart';
 import '../services/storage_service.dart';
-import '../services/voice_service.dart';
 import '../widgets/app_toast.dart';
 import 'lobby_screen.dart';
 
@@ -47,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _createRoom() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (_roomCodeController.text.trim().isEmpty) {
       AppToast.show(
         context,
@@ -73,19 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      // Try to join voice room, but don't fail if it doesn't work
-      final joinedVoice = await VoiceService.joinRoom(roomCode, playerId, playerName);
-      if (!joinedVoice && mounted) {
-        AppToast.show(
-          context,
-          'Room created, but voice chat unavailable',
-          type: AppToastType.info,
-        );
-      }
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LobbyScreen()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const LobbyScreen()));
     } catch (e) {
       if (!mounted) return;
       AppToast.show(
@@ -130,19 +119,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      // Try to join voice room, but don't fail if it doesn't work
-      final joinedVoice = await VoiceService.joinRoom(roomCode, playerId, playerName);
-      if (!joinedVoice && mounted) {
-        AppToast.show(
-          context,
-          'Joined room, but voice chat unavailable',
-          type: AppToastType.info,
-        );
-      }
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LobbyScreen()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const LobbyScreen()));
     } catch (e) {
       if (!mounted) return;
       AppToast.show(
@@ -211,7 +190,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 shape: BoxShape.circle,
                                 color: Colors.black.withOpacity(0.2),
                                 border: Border.all(
-                                  color: const Color(0xFF00E5FF).withOpacity(0.6),
+                                  color: const Color(
+                                    0xFF00E5FF,
+                                  ).withOpacity(0.6),
                                   width: 2,
                                 ),
                               ),
@@ -227,12 +208,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       SizedBox(height: verticalUnit * 1.2),
                       Text(
                         'ONO',
-                        style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                              color: const Color(0xFF00E5FF),
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 8,
-                              fontSize: 48,
-                            ),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.displayLarge?.copyWith(
+                          color: const Color(0xFF00E5FF),
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 8,
+                          fontSize: 48,
+                        ),
                       ),
                       SizedBox(height: verticalUnit * 0.6),
                       Text(
@@ -263,24 +246,41 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               decoration: InputDecoration(
                                 labelText: 'Player Name',
-                                labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                                labelStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
                                 hintText: 'Enter your name',
-                                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                                prefixIcon: Icon(Icons.person_outline, color: Colors.white.withOpacity(0.7)),
+                                hintStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.3),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.person_outline,
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.04),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 18,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
+                                  borderSide: BorderSide(
+                                    color: Colors.white.withOpacity(0.18),
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
+                                  borderSide: BorderSide(
+                                    color: Colors.white.withOpacity(0.18),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 2),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF00E5FF),
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                               validator: (value) {
@@ -300,24 +300,41 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               decoration: InputDecoration(
                                 labelText: 'Room Code',
-                                labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                                labelStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
                                 hintText: 'e.g. GAME123',
-                                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                                prefixIcon: Icon(Icons.tag, color: Colors.white.withOpacity(0.7)),
+                                hintStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.3),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.tag,
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
                                 filled: true,
                                 fillColor: Colors.white.withOpacity(0.04),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 18,
+                                ),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
+                                  borderSide: BorderSide(
+                                    color: Colors.white.withOpacity(0.18),
+                                  ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: BorderSide(color: Colors.white.withOpacity(0.18)),
+                                  borderSide: BorderSide(
+                                    color: Colors.white.withOpacity(0.18),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(24),
-                                  borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 2),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF00E5FF),
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                               textCapitalization: TextCapitalization.characters,
@@ -336,40 +353,44 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: (_isLoading && !_isCreating) ? null : _createRoom,
+                          onPressed:
+                              (_isLoading && !_isCreating) ? null : _createRoom,
                           style: ElevatedButton.styleFrom(
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
                             elevation: 8,
-                            shadowColor: const Color(0xFF00E5FF).withOpacity(0.4),
+                            shadowColor: const Color(
+                              0xFF00E5FF,
+                            ).withOpacity(0.4),
                           ),
-                          child: (_isLoading && _isCreating)
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.black,
-                                    ),
-                                  ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Icon(Icons.add_circle_outline, size: 22),
-                                    SizedBox(width: 10),
-                                    Text(
-                                      'CREATE ROOM',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1,
+                          child:
+                              (_isLoading && _isCreating)
+                                  ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.black,
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  )
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Icon(Icons.add_circle_outline, size: 22),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'CREATE ROOM',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -377,7 +398,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: double.infinity,
                         height: 56,
                         child: OutlinedButton(
-                          onPressed: (_isLoading && !_isJoining) ? null : _joinRoom,
+                          onPressed:
+                              (_isLoading && !_isJoining) ? null : _joinRoom,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF00E5FF),
                             side: const BorderSide(
@@ -388,32 +410,33 @@ class _HomeScreenState extends State<HomeScreen> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          child: (_isLoading && _isJoining)
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Color(0xFF00E5FF),
-                                    ),
-                                  ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Icon(Icons.login, size: 22),
-                                    SizedBox(width: 10),
-                                    Text(
-                                      'JOIN ROOM',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1,
+                          child:
+                              (_isLoading && _isJoining)
+                                  ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF00E5FF),
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  )
+                                  : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Icon(Icons.login, size: 22),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'JOIN ROOM',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -428,7 +451,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: const Color(0xFF4CAF50),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF4CAF50).withOpacity(0.5),
+                                  color: const Color(
+                                    0xFF4CAF50,
+                                  ).withOpacity(0.5),
                                   blurRadius: 6,
                                 ),
                               ],

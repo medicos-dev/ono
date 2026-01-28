@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/voice_service.dart';
+import '../services/webrtc_service.dart';
 import 'app_toast.dart';
 
 class MicToggleWidget extends StatefulWidget {
@@ -23,18 +23,16 @@ class _MicToggleWidgetState extends State<MicToggleWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final voiceService = VoiceService();
-    
     final hasRoom = widget.roomCode != null && widget.roomCode!.isNotEmpty;
-    final isEngineReady = voiceService.isEngineInitialized;
-    final enabled = hasRoom && isEngineReady;
+    // We assume readiness if the room is active; WebRTCService handles the internal state
+    final enabled = hasRoom;
 
     Future<void> handlePressDown() async {
       if (!enabled) {
         if (context.mounted) {
           AppToast.show(
             context,
-            'Voice chat unavailable (engine not ready or no room)',
+            'Voice chat unavailable (no room code)',
             type: AppToastType.info,
           );
         }
@@ -42,13 +40,13 @@ class _MicToggleWidgetState extends State<MicToggleWidget> {
       }
 
       setState(() => _isMicPressed = true);
-      await VoiceService.startSpeaking();
+      await WebRTCService().toggleMic(true);
     }
 
     Future<void> handlePressUp() async {
       if (_isMicPressed) {
         setState(() => _isMicPressed = false);
-        await VoiceService.stopSpeaking();
+        await WebRTCService().toggleMic(false);
       }
     }
 
@@ -63,9 +61,10 @@ class _MicToggleWidgetState extends State<MicToggleWidget> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: LinearGradient(
-            colors: _isMicPressed
-                ? const [Color(0xFFE94560), Color(0xFFFF6B6B)]
-                : [Colors.grey.shade800, Colors.grey.shade700],
+            colors:
+                _isMicPressed
+                    ? const [Color(0xFFE94560), Color(0xFFFF6B6B)]
+                    : [Colors.grey.shade800, Colors.grey.shade700],
           ),
           boxShadow: [
             BoxShadow(
@@ -75,10 +74,7 @@ class _MicToggleWidgetState extends State<MicToggleWidget> {
               spreadRadius: 1,
             ),
           ],
-          border: Border.all(
-            color: Colors.white.withOpacity(0.15),
-            width: 1,
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
         ),
         child: Icon(
           _isMicPressed ? Icons.mic : Icons.mic_off,
