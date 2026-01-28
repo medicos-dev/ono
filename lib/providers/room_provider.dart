@@ -10,7 +10,7 @@ import '../models/isar_models.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/isar_service.dart';
-import '../services/voice_service.dart';
+import '../services/webrtc_service.dart';
 
 class RoomProvider with ChangeNotifier {
   Room? _room;
@@ -44,11 +44,17 @@ class RoomProvider with ChangeNotifier {
 
   final ApiService _apiService = ApiService();
 
-  Future<void> createRoom(String playerName, String playerId, String roomCode) async {
+  Future<void> createRoom(
+    String playerName,
+    String playerId,
+    String roomCode,
+  ) async {
     try {
       _error = null;
       if (_apiService.baseUrl == null || _apiService.baseUrl!.isEmpty) {
-        throw Exception('API base URL not initialized. Please check your .env file and restart the app.');
+        throw Exception(
+          'API base URL not initialized. Please check your .env file and restart the app.',
+        );
       }
       // Clear any stale cache for this room
       await IsarService.clearRoomData(roomCode.toUpperCase());
@@ -62,6 +68,13 @@ class RoomProvider with ChangeNotifier {
       await StorageService.saveRoomCode(room.code);
       _startPolling();
       _startHeartbeat();
+
+      // Initialize WebRTC
+      await WebRTCService().joinRoom(room.code, playerId);
+      if (_room != null) {
+        WebRTCService().onPlayersChanged(_room!.players);
+      }
+
       _subscribeToIsarUpdates(room.code);
       notifyListeners();
     } catch (e) {
@@ -71,16 +84,22 @@ class RoomProvider with ChangeNotifier {
     }
   }
 
-  Future<void> joinRoom(String roomCode, String playerName, String playerId) async {
+  Future<void> joinRoom(
+    String roomCode,
+    String playerName,
+    String playerId,
+  ) async {
     try {
       _error = null;
       if (_apiService.baseUrl == null || _apiService.baseUrl!.isEmpty) {
-        throw Exception('API base URL not initialized. Please check your .env file and restart the app.');
+        throw Exception(
+          'API base URL not initialized. Please check your .env file and restart the app.',
+        );
       }
-      
+
       // Clear any stale cache for this room before joining
       await IsarService.clearRoomData(roomCode.toUpperCase());
-      
+
       // Join room - response is ACK only, do NOT parse room data
       await _apiService.joinRoom(roomCode.toUpperCase(), playerName, playerId);
 
@@ -96,7 +115,9 @@ class RoomProvider with ChangeNotifier {
       );
 
       if (joinedRoom == null) {
-        throw Exception('Failed to load room state after join. Please try again.');
+        throw Exception(
+          'Failed to load room state after join. Please try again.',
+        );
       }
 
       // Persist and hydrate local room state from the polled snapshot
@@ -110,13 +131,20 @@ class RoomProvider with ChangeNotifier {
           );
         } catch (_) {
           // If player not found in snapshot, treat as fatal for this join
-          throw Exception('Joined room but player is missing from room snapshot.');
+          throw Exception(
+            'Joined room but player is missing from room snapshot.',
+          );
         }
       }
 
       // Start ongoing polling and heartbeat after we have a valid room snapshot
       _startPolling();
       _startHeartbeat();
+
+      // Initialize WebRTC
+      await WebRTCService().joinRoom(joinedRoom.code, playerId);
+      WebRTCService().onPlayersChanged(joinedRoom.players);
+
       _subscribeToIsarUpdates(joinedRoom.code);
 
       notifyListeners();
@@ -136,7 +164,12 @@ class RoomProvider with ChangeNotifier {
     stopPolling();
     _stopHeartbeat();
     _isarSubscription?.cancel();
+    _isarSubscription?.cancel();
     _isarSubscription = null;
+
+    // Cleanup WebRTC
+    await WebRTCService().leaveRoom();
+
     _room = null;
     _currentPlayer = null;
     notifyListeners();
@@ -145,8 +178,7 @@ class RoomProvider with ChangeNotifier {
       await _apiService.leaveRoom(roomCode, playerId);
       await StorageService.clearRoomCode();
       await IsarService.clearRoomData(roomCode);
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   void _subscribeToIsarUpdates(String roomCode) {
@@ -159,6 +191,10 @@ class RoomProvider with ChangeNotifier {
           orElse: () => _currentPlayer!,
         );
       }
+      if (_room != null) {
+        // Update WebRTC mesh connections
+        WebRTCService().onPlayersChanged(_room!.players);
+      }
       notifyListeners();
     });
   }
@@ -169,7 +205,9 @@ class RoomProvider with ChangeNotifier {
     try {
       _error = null;
       _room = await _apiService.resignHost(_room!.code, _currentPlayer!.id);
-      _currentPlayer = _room!.players.firstWhere((p) => p.id == _currentPlayer!.id);
+      _currentPlayer = _room!.players.firstWhere(
+        (p) => p.id == _currentPlayer!.id,
+      );
       notifyListeners();
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -184,7 +222,9 @@ class RoomProvider with ChangeNotifier {
     try {
       _error = null;
       _room = await _apiService.startGame(_room!.code, _currentPlayer!.id);
-      _currentPlayer = _room!.players.firstWhere((p) => p.id == _currentPlayer!.id);
+      _currentPlayer = _room!.players.firstWhere(
+        (p) => p.id == _currentPlayer!.id,
+      );
       notifyListeners();
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -195,16 +235,17 @@ class RoomProvider with ChangeNotifier {
 
   Future<void> initializeApi(String url) async {
     _apiService.initialize(url);
-    
+
     final savedRoomCode = await StorageService.getRoomCode();
     if (savedRoomCode != null && savedRoomCode.isNotEmpty) {
       final cachedRoom = await IsarService.getCachedRoom(savedRoomCode);
       if (cachedRoom != null) {
-        final metadata = await IsarService.instance.syncMetadatas
-            .filter()
-            .roomCodeEqualTo(savedRoomCode)
-            .findFirst();
-        
+        final metadata =
+            await IsarService.instance.syncMetadatas
+                .filter()
+                .roomCodeEqualTo(savedRoomCode)
+                .findFirst();
+
         if (metadata?.needsFullSync == true) {
           await IsarService.markNeedsFullSync(savedRoomCode);
         }
@@ -219,10 +260,11 @@ class RoomProvider with ChangeNotifier {
     }
 
     try {
-      final metadata = await IsarService.instance.syncMetadatas
-          .filter()
-          .roomCodeEqualTo(_room!.code)
-          .findFirst();
+      final metadata =
+          await IsarService.instance.syncMetadatas
+              .filter()
+              .roomCodeEqualTo(_room!.code)
+              .findFirst();
 
       if (metadata?.needsFullSync == true) {
         await _performFullSync();
@@ -232,11 +274,11 @@ class RoomProvider with ChangeNotifier {
       final lastVersion = _room!.gameState?.stateVersion ?? 0;
       final isSpectator = _currentPlayer!.isSpectator;
       final updatedRoom = await _apiService.pollRoom(
-        _room!.code, 
+        _room!.code,
         lastKnownVersion: lastVersion,
         isSpectator: isSpectator,
       );
-      
+
       if (updatedRoom != null) {
         if (updatedRoom.code != _room!.code) {
           await leaveRoom();
@@ -244,11 +286,16 @@ class RoomProvider with ChangeNotifier {
         }
 
         final newVersion = updatedRoom.gameState?.stateVersion ?? 0;
-        final playersChanged = updatedRoom.players.length != _room!.players.length;
+        final playersChanged =
+            updatedRoom.players.length != _room!.players.length;
         final statusChanged = updatedRoom.status != _room!.status;
-        final hasEvents = updatedRoom.events != null && updatedRoom.events!.isNotEmpty;
-        
-        if (newVersion > lastVersion || playersChanged || statusChanged || hasEvents) {
+        final hasEvents =
+            updatedRoom.events != null && updatedRoom.events!.isNotEmpty;
+
+        if (newVersion > lastVersion ||
+            playersChanged ||
+            statusChanged ||
+            hasEvents) {
           await IsarService.writeRoomSnapshot(updatedRoom);
           final cachedRoom = await IsarService.getCachedRoom(updatedRoom.code);
           if (cachedRoom != null) {
@@ -259,7 +306,10 @@ class RoomProvider with ChangeNotifier {
                 orElse: () => _currentPlayer!,
               );
             }
-            if (newVersion > _lastNotifiedVersion || playersChanged || statusChanged || hasEvents) {
+            if (newVersion > _lastNotifiedVersion ||
+                playersChanged ||
+                statusChanged ||
+                hasEvents) {
               _lastNotifiedVersion = newVersion;
               notifyListeners();
             }
@@ -270,7 +320,7 @@ class RoomProvider with ChangeNotifier {
       await _handleRoomDeleted(e.reason);
     } catch (e) {
       final errorMessage = e.toString().toLowerCase();
-      if (errorMessage.contains('room not found') || 
+      if (errorMessage.contains('room not found') ||
           errorMessage.contains('not found') ||
           errorMessage.contains('404') ||
           errorMessage.contains('room deleted')) {
@@ -284,14 +334,18 @@ class RoomProvider with ChangeNotifier {
     if (_room == null || _currentPlayer == null) return;
 
     try {
-      final updatedRoom = await _apiService.pollRoom(_room!.code, lastKnownVersion: 0);
+      final updatedRoom = await _apiService.pollRoom(
+        _room!.code,
+        lastKnownVersion: 0,
+      );
       if (updatedRoom != null) {
         await IsarService.writeRoomSnapshot(updatedRoom);
         await IsarService.clearPendingEvents(_room!.code);
-        final metadata = await IsarService.instance.syncMetadatas
-            .filter()
-            .roomCodeEqualTo(_room!.code)
-            .findFirst();
+        final metadata =
+            await IsarService.instance.syncMetadatas
+                .filter()
+                .roomCodeEqualTo(_room!.code)
+                .findFirst();
         if (metadata != null) {
           metadata.needsFullSync = false;
           await IsarService.instance.syncMetadatas.put(metadata);
@@ -317,23 +371,24 @@ class RoomProvider with ChangeNotifier {
 
   Future<void> _handleRoomDeleted(String reason) async {
     final roomCode = _room?.code;
-    
+
     stopPolling();
     _stopHeartbeat();
     _isarSubscription?.cancel();
     _isarSubscription = null;
-    
+
     if (roomCode != null) {
-      await VoiceService.leaveRoom();
+      await WebRTCService().leaveRoom();
       await IsarService.clearRoomData(roomCode);
       await StorageService.clearRoomCode();
     }
-    
+
     _room = null;
     _currentPlayer = null;
-    _error = reason == 'HOST_LEFT' 
-        ? 'Host left the room. Returning to home.'
-        : 'Room was deleted. Returning to home.';
+    _error =
+        reason == 'HOST_LEFT'
+            ? 'Host left the room. Returning to home.'
+            : 'Room was deleted. Returning to home.';
     notifyListeners();
   }
 
@@ -341,7 +396,8 @@ class RoomProvider with ChangeNotifier {
     stopPolling();
     _isPolling = true;
     final isSpectator = _currentPlayer?.isSpectator ?? false;
-    final pollInterval = isSpectator ? const Duration(seconds: 8) : const Duration(seconds: 2);
+    final pollInterval =
+        isSpectator ? const Duration(seconds: 8) : const Duration(seconds: 2);
     _pollTimer = Timer.periodic(pollInterval, (_) {
       updateRoom();
     });
@@ -376,7 +432,7 @@ class RoomProvider with ChangeNotifier {
     final cachedRoom = await IsarService.getCachedRoom(room.code);
     if (cachedRoom != null) {
       final newVersion = cachedRoom.gameState?.stateVersion ?? 0;
-      if (newVersion > _lastNotifiedVersion || 
+      if (newVersion > _lastNotifiedVersion ||
           _room == null ||
           cachedRoom.players.length != _room!.players.length ||
           cachedRoom.status != _room!.status) {

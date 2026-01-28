@@ -27,3 +27,16 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE INDEX IF NOT EXISTS idx_players_room_code ON players(room_code);
 CREATE INDEX IF NOT EXISTS idx_rooms_last_activity ON rooms(last_activity);
 CREATE INDEX IF NOT EXISTS idx_rooms_code ON rooms(code);
+
+CREATE TABLE IF NOT EXISTS rtc_signals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_code TEXT NOT NULL,
+  from_player_id TEXT NOT NULL,
+  to_player_id TEXT NOT NULL,
+  signal_type TEXT NOT NULL,  -- 'offer', 'answer', 'candidate'
+  signal_data TEXT NOT NULL,  -- JSON string of the SDP or ICE candidate
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (room_code) REFERENCES rooms(code) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_rtc_signals_to_player ON rtc_signals(to_player_id, room_code);

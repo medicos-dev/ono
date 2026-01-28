@@ -24,10 +24,16 @@ class ApiService {
     if (baseUrl == null || baseUrl!.isEmpty) {
       throw Exception('API base URL not initialized. Set it in .env file.');
     }
-    return baseUrl!.endsWith('/') ? baseUrl!.substring(0, baseUrl!.length - 1) : baseUrl!;
+    return baseUrl!.endsWith('/')
+        ? baseUrl!.substring(0, baseUrl!.length - 1)
+        : baseUrl!;
   }
 
-  Future<Room> createRoom(String playerName, String playerId, String roomCode) async {
+  Future<Room> createRoom(
+    String playerName,
+    String playerId,
+    String roomCode,
+  ) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/room/create'),
       headers: {'Content-Type': 'application/json'},
@@ -45,7 +51,11 @@ class ApiService {
     return Room.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<void> joinRoom(String roomCode, String playerName, String playerId) async {
+  Future<void> joinRoom(
+    String roomCode,
+    String playerName,
+    String playerId,
+  ) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/room/join'),
       headers: {'Content-Type': 'application/json'},
@@ -194,7 +204,11 @@ class ApiService {
     return Room.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<Room> syncGame(String roomCode, String playerId, int stateVersion) async {
+  Future<Room> syncGame(
+    String roomCode,
+    String playerId,
+    int stateVersion,
+  ) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/sync'),
       headers: {'Content-Type': 'application/json'},
@@ -212,7 +226,11 @@ class ApiService {
     return Room.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<Room?> pollRoom(String roomCode, {int? lastKnownVersion, bool isSpectator = false}) async {
+  Future<Room?> pollRoom(
+    String roomCode, {
+    int? lastKnownVersion,
+    bool isSpectator = false,
+  }) async {
     final params = <String, String>{};
     if (lastKnownVersion != null) {
       params['lastKnownVersion'] = lastKnownVersion.toString();
@@ -220,22 +238,24 @@ class ApiService {
     if (isSpectator) {
       params['isSpectator'] = 'true';
     }
-    
-    final queryString = params.entries.map((e) => '${e.key}=${e.value}').join('&');
-    final url = '$_baseUrl/poll/${roomCode.toUpperCase()}${queryString.isNotEmpty ? '?$queryString' : ''}';
-    
+
+    final queryString = params.entries
+        .map((e) => '${e.key}=${e.value}')
+        .join('&');
+    final url =
+        '$_baseUrl/poll/${roomCode.toUpperCase()}${queryString.isNotEmpty ? '?$queryString' : ''}';
+
     try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 20));
+      final response = await http
+          .get(Uri.parse(url), headers: {'Content-Type': 'application/json'})
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 304 || response.statusCode != 200) {
         return null;
       }
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      
+
       if (body['changed'] == false) {
         return null;
       }
@@ -244,11 +264,12 @@ class ApiService {
       if (body['type'] == 'ROOM_DELETED') {
         throw RoomDeletedException(
           reason: body['reason'] as String? ?? 'UNKNOWN',
-          events: body['events'] != null
-              ? (body['events'] as List<dynamic>)
-                  .map((e) => GameEvent.fromJson(e as Map<String, dynamic>))
-                  .toList()
-              : [],
+          events:
+              body['events'] != null
+                  ? (body['events'] as List<dynamic>)
+                      .map((e) => GameEvent.fromJson(e as Map<String, dynamic>))
+                      .toList()
+                  : [],
         );
       }
 
@@ -267,15 +288,55 @@ class ApiService {
 
   Future<void> sendHeartbeat(String roomCode, String playerId) async {
     try {
-      await http.post(
-        Uri.parse('$_baseUrl/heartbeat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'roomCode': roomCode.toUpperCase(),
-          'playerId': playerId,
-        }),
-      ).timeout(const Duration(seconds: 5));
-    } catch (_) {
+      await http
+          .post(
+            Uri.parse('$_baseUrl/heartbeat'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'roomCode': roomCode.toUpperCase(),
+              'playerId': playerId,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
+  }
+
+  Future<void> sendRTCSignal({
+    required String roomCode,
+    required String fromPlayerId,
+    required String toPlayerId,
+    required String signalType,
+    required String signalData,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/rtc/signal'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'roomCode': roomCode.toUpperCase(),
+        'fromPlayerId': fromPlayerId,
+        'toPlayerId': toPlayerId,
+        'signalType': signalType,
+        'signalData': signalData,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to send RTC signal: ${response.body}');
     }
+  }
+
+  Future<List<dynamic>> getRTCSignals(String playerId) async {
+    final url = '$_baseUrl/rtc/signals/$playerId';
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to get RTC signals: ${response.body}');
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return body['signals'] as List<dynamic>? ?? [];
   }
 }

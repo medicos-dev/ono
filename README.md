@@ -6,7 +6,7 @@ A production-ready, real-time multiplayer UNO card game built with Flutter and C
 
 - 🎮 **Full UNO Game Logic**: Complete implementation of all UNO rules including wild cards, action cards, stacking, and UNO calling
 - 👥 **Multiplayer Support**: Support for up to 10 players per room
-- 🎤 **Voice Chat**: Push-to-talk voice chat using Zego Cloud Audio Room
+- 🎤 **Voice Chat**: Push-to-talk voice chat using custom WebRTC Mesh Network
 - 🎨 **Dark Theme**: Beautiful dark theme with neon accents
 - 🔄 **Real-time Sync**: HTTP polling with long polling fallback for state synchronization
 - 🏠 **No Authentication**: Simple player name + room code entry
@@ -17,7 +17,7 @@ A production-ready, real-time multiplayer UNO card game built with Flutter and C
 ### Frontend
 - **Flutter** (latest stable)
 - **Provider** (state management)
-- **Zego Express Engine** (voice chat)
+- **Flutter WebRTC** (voice chat)
 - **HTTP** (API communication)
 
 ### Backend
@@ -32,7 +32,6 @@ A production-ready, real-time multiplayer UNO card game built with Flutter and C
 - Flutter SDK (latest stable)
 - Node.js 18+
 - Cloudflare account with Workers and D1 enabled
-- Zego Cloud account (for voice chat)
 
 ### Backend Setup
 
@@ -78,11 +77,8 @@ npm run deploy
 cp .env.example .env
 ```
 
-2. Update `.env` with your configuration:
 ```env
-API_URL=https://your-worker.workers.dev
-ZEGO_APP_ID=your_zego_app_id
-ZEGO_APP_SIGN=your_zego_app_sign
+API_URL=https://uno-aiks-production.pojofiles.workers.dev
 ```
 
 3. Install Flutter dependencies:
@@ -221,7 +217,7 @@ flutter build ios --release
 ### Common Issues
 
 1. **API URL not working**: Ensure your Cloudflare Worker is deployed and the URL in `.env` is correct
-2. **Voice chat not working**: Verify Zego App ID and App Sign are correct in `.env`
+2. **Voice chat not working**: Ensure microphone permissions are granted. WebRTC requires a stable connection between peers.
 3. **Database errors**: Make sure the D1 database schema is applied correctly
 4. **App icon not showing**: Run `flutter clean` and `flutter pub get`, then rebuild
 

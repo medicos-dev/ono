@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import '../services/voice_service.dart';
 import '../providers/room_provider.dart';
 import '../providers/game_provider.dart';
 import '../widgets/app_toast.dart';
@@ -13,15 +12,8 @@ import 'home_screen.dart';
 /// Animated splash screen with ONO logo and "By Aiks..." text
 class SplashScreen extends StatefulWidget {
   final String? apiUrl;
-  final int? zegoAppId;
-  final String? zegoAppSign;
 
-  const SplashScreen({
-    super.key,
-    this.apiUrl,
-    this.zegoAppId,
-    this.zegoAppSign,
-  });
+  const SplashScreen({super.key, this.apiUrl});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -146,14 +138,20 @@ class _SplashScreenState extends State<SplashScreen>
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: AppTheme.darkSurface,
-          title: Text('Microphone Permission Required', style: TextStyle(color: AppTheme.textPrimary)),
+          title: Text(
+            'Microphone Permission Required',
+            style: TextStyle(color: AppTheme.textPrimary),
+          ),
           content: Text(
             'Voice chat requires microphone access. Please enable it in your device settings.',
             style: TextStyle(color: AppTheme.textSecondary),
           ),
           actions: <Widget>[
             TextButton(
-              child: Text('Continue Anyway', style: TextStyle(color: AppTheme.textSecondary)),
+              child: Text(
+                'Continue Anyway',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
               onPressed: () {
                 Navigator.of(context).pop();
               },
@@ -205,35 +203,33 @@ class _SplashScreenState extends State<SplashScreen>
       try {
         await dotenv.load(fileName: '.env');
         print('SplashScreen: Environment loaded successfully');
-        print('SplashScreen: API_URL from .env: ${dotenv.env['API_URL'] ?? 'NOT FOUND'}');
-        print('SplashScreen: ZEGO_APP_ID from .env: ${dotenv.env['ZEGO_APP_ID'] ?? 'NOT FOUND'}');
+        print(
+          'SplashScreen: API_URL from .env: ${dotenv.env['API_URL'] ?? 'NOT FOUND'}',
+        );
+        print(
+          'SplashScreen: ZEGO_APP_ID from .env: ${dotenv.env['ZEGO_APP_ID'] ?? 'NOT FOUND'}',
+        );
       } catch (e) {
         print('SplashScreen: ERROR - Could not load .env file: $e');
-        print('SplashScreen: Make sure .env file exists in root directory and is listed in pubspec.yaml assets');
+        print(
+          'SplashScreen: Make sure .env file exists in root directory and is listed in pubspec.yaml assets',
+        );
       }
 
-      print('SplashScreen: Step 2 - Initializing Zego');
-      final zegoAppId = widget.zegoAppId ?? 
-          int.tryParse(dotenv.env['ZEGO_APP_ID'] ?? '0') ?? 0;
-      final zegoAppSign = widget.zegoAppSign ?? 
-          (dotenv.env['ZEGO_APP_SIGN'] ?? '');
-      
-      print('SplashScreen: Zego App ID: $zegoAppId, Sign: ${zegoAppSign.isNotEmpty ? 'SET' : 'EMPTY'}');
-      
-      if (zegoAppId > 0 && zegoAppSign.isNotEmpty) {
-        await VoiceService().init(zegoAppId, zegoAppSign);
-        print('SplashScreen: Zego initialized');
-      } else {
-        print('SplashScreen: Zego credentials not available, skipping');
-      }
+      print('SplashScreen: WebRTC initialized');
 
       print('SplashScreen: Step 3 - Initializing API');
       final apiUrl = widget.apiUrl ?? (dotenv.env['API_URL'] ?? '');
-      print('SplashScreen: API URL to use: ${apiUrl.isEmpty ? 'EMPTY' : apiUrl}');
-      
+      print(
+        'SplashScreen: API URL to use: ${apiUrl.isEmpty ? 'EMPTY' : apiUrl}',
+      );
+
       if (apiUrl.isNotEmpty && mounted) {
         try {
-          final roomProvider = Provider.of<RoomProvider>(context, listen: false);
+          final roomProvider = Provider.of<RoomProvider>(
+            context,
+            listen: false,
+          );
           await roomProvider.initializeApi(apiUrl);
           print('SplashScreen: API initialized successfully with URL: $apiUrl');
         } catch (e) {
@@ -241,7 +237,9 @@ class _SplashScreenState extends State<SplashScreen>
         }
       } else {
         print('SplashScreen: ERROR - API_URL is empty or not found!');
-        print('SplashScreen: Please check your .env file contains: API_URL=https://ono-worker-production.pojofiles.workers.dev');
+        print(
+          'SplashScreen: Please check your .env file contains: API_URL=https://ono-worker-production.pojofiles.workers.dev',
+        );
         if (mounted) {
           AppToast.show(
             context,
@@ -258,9 +256,7 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const HomeScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       }
     } catch (e) {
@@ -269,9 +265,7 @@ class _SplashScreenState extends State<SplashScreen>
       await Future.delayed(const Duration(milliseconds: 1500));
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const HomeScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       }
     }
@@ -324,7 +318,9 @@ class _SplashScreenState extends State<SplashScreen>
                                 borderRadius: BorderRadius.circular(40),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFFE94560).withOpacity(0.5),
+                                    color: const Color(
+                                      0xFFE94560,
+                                    ).withOpacity(0.5),
                                     blurRadius: 30,
                                     spreadRadius: 5,
                                   ),
@@ -341,7 +337,9 @@ class _SplashScreenState extends State<SplashScreen>
                                         gradient: LinearGradient(
                                           colors: [
                                             const Color(0xFFE94560),
-                                            const Color(0xFFE94560).withOpacity(0.8),
+                                            const Color(
+                                              0xFFE94560,
+                                            ).withOpacity(0.8),
                                           ],
                                         ),
                                         borderRadius: BorderRadius.circular(40),

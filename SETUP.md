@@ -38,9 +38,7 @@ npm install
 
 2. Update `.env` with your configuration:
    ```env
-   API_URL=https://your-worker.workers.dev
-   ZEGO_APP_ID=your_zego_app_id
-   ZEGO_APP_SIGN=your_zego_app_sign
+   API_URL=https://uno-aiks-production.pojofiles.workers.dev
    ```
 
 3. Setup app icons (Android):
@@ -98,20 +96,21 @@ To set up app icons:
      convert "assets/ONO APP LOGO.png" -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
      ```
 
-## Zego Voice Chat Setup
+## WebRTC Voice Chat Setup
 
-1. Sign up at https://www.zegocloud.com/
-2. Create a new project
-3. Get your App ID and App Sign
-4. Add them to your `.env` file
+The voice chat uses a custom WebRTC implementation with a mesh network topology.
 
-**Note:** The Zego SDK API might vary by version. If you encounter errors in `lib/services/voice_service.dart`, you may need to adjust the API calls based on your SDK version. Check the Zego Express Engine documentation for the correct API.
+1. **Permissions**: The app requires microphone permission.
+2. **STUN Servers**: Google's public STUN servers are used by default (`stun.l.google.com:19302`).
+3. **Signaling**: Handled by the custom Cloudflare Worker endpoints (`/rtc/signal` and `/rtc/signals/:playerId`).
+
+**Note:** No external signaling account (like Zego) is required.
 
 ## Troubleshooting
 
 ### Voice Service Errors
 
-If you get errors related to Zego SDK methods, check the actual API for your SDK version and update `lib/services/voice_service.dart` accordingly.
+If you encounter audio issues, ensure all players have granted microphone permissions and are on stable network connections. Check the WebRTC logs for "Connection state: failed" or "ICE connection disconnected".
 
 ### API Connection Issues
 
@@ -145,4 +144,3 @@ If you get errors related to Zego SDK methods, check the actual API for your SDK
 2. Set up your `.env` file
 3. Configure app icons
 4. Test the app on your device
-5. Adjust Zego SDK calls if needed based on your SDK version

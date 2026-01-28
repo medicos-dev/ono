@@ -7,7 +7,7 @@ import '../models/card.dart';
 import '../services/api_service.dart';
 import '../services/isar_service.dart';
 import '../providers/room_provider.dart';
-import '../services/voice_service.dart';
+import '../services/webrtc_service.dart';
 
 class GameProvider with ChangeNotifier {
   final RoomProvider roomProvider;
@@ -41,7 +41,7 @@ class GameProvider with ChangeNotifier {
     if (gameState == null || currentPlayer == null) return false;
     if (gameState!.pendingDrawCount > 0 && !_canStack()) return false;
     if (_selectedCard == null) return false;
-    
+
     final topCard = gameState!.topDiscardCard;
     if (topCard == null) return false;
 
@@ -73,7 +73,7 @@ class GameProvider with ChangeNotifier {
     if (gameState == null || currentPlayer == null) return false;
     if (gameState!.pendingDrawCount == 0) return true;
     if (gameState!.pendingDrawCount % 2 != 0) return false;
-    
+
     final topCard = gameState!.topDiscardCard;
     if (topCard == null || topCard.type != CardType.drawTwo) return false;
 
@@ -81,9 +81,8 @@ class GameProvider with ChangeNotifier {
       return currentPlayer!.hand.any((c) => c.type == CardType.wildDrawFour);
     }
 
-    return currentPlayer!.hand.any((c) => 
-      c.type == CardType.drawTwo && 
-      c.color == gameState!.activeColor
+    return currentPlayer!.hand.any(
+      (c) => c.type == CardType.drawTwo && c.color == gameState!.activeColor,
     );
   }
 
@@ -110,7 +109,8 @@ class GameProvider with ChangeNotifier {
     if (_isProcessingAction || !isMyTurn) return;
     if (room == null || currentPlayer == null) return;
 
-    final eventId = '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
+    final eventId =
+        '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
     final currentVersion = gameState?.stateVersion ?? 0;
 
     try {
@@ -118,8 +118,10 @@ class GameProvider with ChangeNotifier {
       _actionError = null;
       notifyListeners();
 
-      final optimisticHand = List<UnoCard>.from(currentPlayer!.hand)..remove(card);
-      final optimisticDiscard = List<UnoCard>.from(gameState!.discardPile)..add(card);
+      final optimisticHand = List<UnoCard>.from(currentPlayer!.hand)
+        ..remove(card);
+      final optimisticDiscard = List<UnoCard>.from(gameState!.discardPile)
+        ..add(card);
       final optimisticState = gameState!.copyWith(
         discardPile: optimisticDiscard,
         stateVersion: currentVersion + 1,
@@ -131,12 +133,13 @@ class GameProvider with ChangeNotifier {
         hostId: room!.hostId,
         status: room!.status,
         gameState: optimisticState,
-        players: room!.players.map((p) {
-          if (p.id == currentPlayer!.id) {
-            return p.copyWith(hand: optimisticHand);
-          }
-          return p;
-        }).toList(),
+        players:
+            room!.players.map((p) {
+              if (p.id == currentPlayer!.id) {
+                return p.copyWith(hand: optimisticHand);
+              }
+              return p;
+            }).toList(),
         lastActivity: DateTime.now(),
       );
 
@@ -182,7 +185,8 @@ class GameProvider with ChangeNotifier {
     if (_isProcessingAction || !isMyTurn) return;
     if (room == null || currentPlayer == null) return;
 
-    final eventId = '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
+    final eventId =
+        '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
     final currentVersion = gameState?.stateVersion ?? 0;
 
     try {
@@ -190,7 +194,10 @@ class GameProvider with ChangeNotifier {
       _actionError = null;
       notifyListeners();
 
-      final updatedRoom = await _apiService.drawCard(room!.code, currentPlayer!.id);
+      final updatedRoom = await _apiService.drawCard(
+        room!.code,
+        currentPlayer!.id,
+      );
 
       await IsarService.writeRoomSnapshot(updatedRoom);
       await IsarService.addEvent(
@@ -220,7 +227,8 @@ class GameProvider with ChangeNotifier {
     if (_isProcessingAction || !canCallUno) return;
     if (room == null || currentPlayer == null) return;
 
-    final eventId = '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
+    final eventId =
+        '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
     final currentVersion = gameState?.stateVersion ?? 0;
 
     try {
@@ -228,7 +236,10 @@ class GameProvider with ChangeNotifier {
       _actionError = null;
       notifyListeners();
 
-      final updatedRoom = await _apiService.callUno(room!.code, currentPlayer!.id);
+      final updatedRoom = await _apiService.callUno(
+        room!.code,
+        currentPlayer!.id,
+      );
 
       await IsarService.writeRoomSnapshot(updatedRoom);
       await IsarService.addEvent(
@@ -257,7 +268,8 @@ class GameProvider with ChangeNotifier {
     if (_isProcessingAction || !isMyTurn) return;
     if (room == null || currentPlayer == null) return;
 
-    final eventId = '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
+    final eventId =
+        '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
     final currentVersion = gameState?.stateVersion ?? 0;
 
     try {
@@ -265,7 +277,10 @@ class GameProvider with ChangeNotifier {
       _actionError = null;
       notifyListeners();
 
-      final updatedRoom = await _apiService.passTurn(room!.code, currentPlayer!.id);
+      final updatedRoom = await _apiService.passTurn(
+        room!.code,
+        currentPlayer!.id,
+      );
 
       await IsarService.writeRoomSnapshot(updatedRoom);
       await IsarService.addEvent(
@@ -297,11 +312,8 @@ class GameProvider with ChangeNotifier {
   }
 
   Future<void> toggleMic(bool isOn) async {
-    final voiceService = VoiceService();
-    final success = await voiceService.toggleMic(isOn);
-    if (success) {
-      _isMicOn = isOn;
-      notifyListeners();
-    }
+    await WebRTCService().toggleMic(isOn);
+    _isMicOn = isOn;
+    notifyListeners();
   }
 }
