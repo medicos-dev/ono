@@ -156,6 +156,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final verticalUnit = size.height * 0.02;
+
     return Consumer<RoomProvider>(
       builder: (context, roomProvider, _) {
         // Auto-navigate to game screen when game starts and gameState is ready
@@ -206,7 +209,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(size.width * 0.04),
                     child: Card(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -252,13 +255,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
                   ),
                   Expanded(
                     child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: size.width * 0.04,
+                        vertical: verticalUnit * 0.4,
+                      ),
                       itemCount: room.players.length,
                       itemBuilder: (context, index) {
                         final player = room.players[index];
                         final isHost = player.isHost;
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
+                          margin: EdgeInsets.only(bottom: verticalUnit * 0.6),
                           decoration: BoxDecoration(
                             color: AppTheme.darkSurface,
                             borderRadius: BorderRadius.circular(16),
@@ -339,7 +345,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(size.width * 0.04),
                     child: Row(
                       children: [
                         Expanded(

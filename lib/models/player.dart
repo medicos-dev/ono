@@ -46,17 +46,28 @@ class Player {
   }
 
   factory Player.fromJson(Map<String, dynamic> json) {
+    // Safe null handling - never force cast network data
+    final id = json['id'] as String?;
+    final name = json['name'] as String?;
+    final roomCode = json['roomCode'] as String?;
+    final lastSeenStr = json['lastSeen'] as String?;
+    
+    if (id == null || name == null || roomCode == null || lastSeenStr == null) {
+      throw FormatException('Missing required fields in Player JSON: id=$id, name=$name, roomCode=$roomCode, lastSeen=$lastSeenStr');
+    }
+    
     return Player(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      roomCode: json['roomCode'] as String,
+      id: id,
+      name: name,
+      roomCode: roomCode,
       isHost: json['isHost'] as bool? ?? false,
       isSpectator: json['isSpectator'] as bool? ?? false,
       seatNumber: json['seatNumber'] as int?,
       hand: (json['hand'] as List<dynamic>?)
-          ?.map((c) => UnoCard.fromJson(c as Map<String, dynamic>))
+          ?.whereType<Map<String, dynamic>>()
+          .map((c) => UnoCard.fromJson(c))
           .toList() ?? [],
-      lastSeen: DateTime.parse(json['lastSeen'] as String),
+      lastSeen: DateTime.tryParse(lastSeenStr) ?? DateTime.now(),
     );
   }
 

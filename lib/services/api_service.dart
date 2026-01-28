@@ -45,7 +45,7 @@ class ApiService {
     return Room.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<Room> joinRoom(String roomCode, String playerName, String playerId) async {
+  Future<void> joinRoom(String roomCode, String playerName, String playerId) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/room/join'),
       headers: {'Content-Type': 'application/json'},
@@ -57,10 +57,17 @@ class ApiService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to join room: ${response.body}');
+      final body = jsonDecode(response.body) as Map<String, dynamic>?;
+      final error = body?['error'] as String? ?? response.body;
+      throw Exception('Failed to join room: $error');
     }
 
-    return Room.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    // Join response is ACK only - do NOT parse as Room
+    // Client must wait for /poll to receive full room snapshot
+    final body = jsonDecode(response.body) as Map<String, dynamic>?;
+    if (body?['success'] != true && body?['error'] != null) {
+      throw Exception('Failed to join room: ${body!['error']}');
+    }
   }
 
   Future<void> leaveRoom(String roomCode, String playerId) async {

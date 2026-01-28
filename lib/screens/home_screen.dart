@@ -169,22 +169,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final verticalUnit = size.height * 0.02;
+
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0A0A0F),
-              Color(0xFF151520),
-            ],
-          ),
-        ),
+        color: const Color(0xFF0A0A0F),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              padding: EdgeInsets.symmetric(
+                horizontal: size.width * 0.08,
+                vertical: verticalUnit,
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 400),
                 child: Form(
@@ -193,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: EdgeInsets.all(size.width * 0.05),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white.withOpacity(0.03),
@@ -227,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: verticalUnit * 1.2),
                       Text(
                         'ONO',
                         style: Theme.of(context).textTheme.displayLarge?.copyWith(
@@ -237,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontSize: 48,
                             ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: verticalUnit * 0.6),
                       Text(
                         'Card Game Arena',
                         style: TextStyle(
@@ -246,9 +243,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           letterSpacing: 4,
                         ),
                       ),
-                      const SizedBox(height: 48),
+                      SizedBox(height: verticalUnit * 2.4),
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: EdgeInsets.all(size.width * 0.06),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.03),
                           borderRadius: BorderRadius.circular(24),
@@ -293,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: verticalUnit),
                             TextFormField(
                               controller: _roomCodeController,
                               style: TextStyle(
@@ -334,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: verticalUnit * 1.6),
                       SizedBox(
                         width: double.infinity,
                         height: 56,
