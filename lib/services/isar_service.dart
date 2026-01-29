@@ -220,7 +220,7 @@ class IsarService {
               .findFirst();
 
       final currentVersion = metadata?.lastAppliedStateVersion ?? 0;
-      final incomingVersion = room.gameState?.stateVersion ?? 0;
+      final incomingVersion = room.stateVersion;
 
       // Control events bypass version checks, but regular updates don't
       final hasControlEvents =
