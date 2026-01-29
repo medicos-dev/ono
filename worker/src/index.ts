@@ -279,7 +279,15 @@ async function handleJoinRoom(request: Request, env: Env): Promise<Response> {
       .bind(now, code)
       .run();
 
-    return new Response(JSON.stringify({ success: true }), {
+    const room = await getRoomWithPlayers(code, env);
+    if (!room) {
+      return new Response(JSON.stringify({ error: 'ROOM_NOT_FOUND' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify(room), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
