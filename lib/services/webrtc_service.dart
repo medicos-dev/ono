@@ -40,11 +40,14 @@ class WebRTCService {
       {'urls': 'stun:stun1.l.google.com:19302'},
       {'urls': 'stun:stun2.l.google.com:19302'},
     ],
+    'sdpSemantics': 'unified-plan',
   };
 
   static const Map<String, dynamic> _config = {
     'mandatory': {'OfferToReceiveAudio': true, 'OfferToReceiveVideo': false},
-    'optional': [],
+    'optional': [
+      {'DtlsSrtpKeyAgreement': true},
+    ],
   };
 
   /// Prepare local media stream
@@ -54,14 +57,21 @@ class WebRTCService {
     final status = await Permission.microphone.request();
     if (!status.isGranted) return;
 
-    _localStream = await navigator.mediaDevices.getUserMedia({
+    // MNC-grade audio constraints
+    final Map<String, dynamic> mediaConstraints = {
       'audio': {
         'echoCancellation': true,
-        'noiseSuppression': true,
         'autoGainControl': true,
+        'noiseSuppression': true,
+        'googEchoCancellation': true,
+        'googAutoGainControl': true,
+        'googNoiseSuppression': true,
+        'googHighpassFilter': true,
       },
       'video': false,
-    });
+    };
+
+    _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
 
     // Start muted
     _localStream!.getAudioTracks().forEach((track) {
