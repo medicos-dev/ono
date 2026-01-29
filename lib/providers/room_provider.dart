@@ -100,25 +100,16 @@ class RoomProvider with ChangeNotifier {
       // Clear any stale cache for this room before joining
       await IsarService.clearRoomData(roomCode.toUpperCase());
 
-      // Join room - response is ACK only, do NOT parse room data
-      await _apiService.joinRoom(roomCode.toUpperCase(), playerName, playerId);
+      // Join room and get authoritative state immediately
+      final joinedRoom = await _apiService.joinRoom(
+        roomCode.toUpperCase(),
+        playerName,
+        playerId,
+      );
 
       // Save player name and room code for polling
       await StorageService.savePlayerName(playerName);
       await StorageService.saveRoomCode(roomCode.toUpperCase());
-
-      // Perform an initial full poll to get the authoritative room snapshot
-      final joinedRoom = await _apiService.pollRoom(
-        roomCode.toUpperCase(),
-        lastKnownVersion: 0,
-        isSpectator: false,
-      );
-
-      if (joinedRoom == null) {
-        throw Exception(
-          'Failed to load room state after join. Please try again.',
-        );
-      }
 
       // Persist and hydrate local room state from the polled snapshot
       await IsarService.writeRoomSnapshot(joinedRoom);

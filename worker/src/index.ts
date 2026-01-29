@@ -1278,7 +1278,6 @@ async function handleSendRTCSignal(request: Request, env: Env): Promise<Response
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('[rtc.signal.error]', error);
     return new Response(JSON.stringify({ error: 'INTERNAL_ERROR' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
