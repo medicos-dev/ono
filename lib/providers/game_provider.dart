@@ -141,6 +141,7 @@ class GameProvider with ChangeNotifier {
               return p;
             }).toList(),
         lastActivity: DateTime.now(),
+        stateVersion: currentVersion + 1,
       );
 
       await IsarService.writeRoomSnapshot(optimisticRoom, isOptimistic: true);

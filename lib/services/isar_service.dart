@@ -185,6 +185,7 @@ class IsarService {
         gameState: gameState,
         players: playerList,
         lastActivity: snapshot.lastUpdated,
+        stateVersion: snapshot.stateVersion,
       );
     } catch (e) {
       return null;
@@ -198,7 +199,8 @@ class IsarService {
     try {
       // Process control events first - they bypass version checks
       if (room.events != null && room.events!.isNotEmpty) {
-        final controlEvents = room.events!.where((e) => e.isControlEvent).toList();
+        final controlEvents =
+            room.events!.where((e) => e.isControlEvent).toList();
         if (controlEvents.isNotEmpty) {
           for (final event in controlEvents) {
             if (event.type == GameEventType.roomDeleted) {
@@ -221,8 +223,11 @@ class IsarService {
       final incomingVersion = room.gameState?.stateVersion ?? 0;
 
       // Control events bypass version checks, but regular updates don't
-      final hasControlEvents = room.events?.any((e) => e.isControlEvent) ?? false;
-      if (incomingVersion < currentVersion && !isOptimistic && !hasControlEvents) {
+      final hasControlEvents =
+          room.events?.any((e) => e.isControlEvent) ?? false;
+      if (incomingVersion < currentVersion &&
+          !isOptimistic &&
+          !hasControlEvents) {
         return false;
       }
 
@@ -337,7 +342,9 @@ class IsarService {
     } catch (e) {}
   }
 
-  static Future<List<isar_models.GameEvent>> getUnappliedEvents(String roomCode) async {
+  static Future<List<isar_models.GameEvent>> getUnappliedEvents(
+    String roomCode,
+  ) async {
     try {
       return await instance.gameEvents
           .filter()

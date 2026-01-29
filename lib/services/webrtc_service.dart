@@ -75,7 +75,6 @@ class WebRTCService {
 
   /// Join a room and start signaling
   Future<void> joinRoom(String roomCode, String playerId) async {
-    print('[WebRTC] Joining room: $roomCode as $playerId');
     _currentRoomCode = roomCode;
     _myPlayerId = playerId;
 
@@ -97,8 +96,6 @@ class WebRTCService {
         // Lexicographically lower ID always sends the offer.
         if (_myPlayerId!.compareTo(remoteId) < 0) {
           _initiateConnection(remoteId);
-        } else {
-          print('[WebRTC] Waiting for offer from $remoteId');
         }
       }
     }
@@ -112,7 +109,6 @@ class WebRTCService {
   }
 
   Future<void> _initiateConnection(String remoteId) async {
-    print('[WebRTC] Initiating offer to $remoteId');
     try {
       final pc = await _getOrCreatePeerConnection(remoteId);
 
@@ -126,9 +122,7 @@ class WebRTCService {
         signalType: 'offer',
         signalData: offer.sdp!,
       );
-    } catch (e) {
-      print('[WebRTC] Failed to initiate connection to $remoteId: $e');
-    }
+    } catch (e) {}
   }
 
   Future<RTCPeerConnection> _getOrCreatePeerConnection(String remoteId) async {
@@ -160,20 +154,18 @@ class WebRTCService {
                 'sdpMLineIndex': candidate.sdpMLineIndex,
               }),
             )
-            .catchError((e) => print('[WebRTC] Candidate send error: $e'));
+            .catchError((e) {});
       }
     };
 
     // Receive remote tracks
     pc.onTrack = (event) {
       if (event.streams.isNotEmpty) {
-        print('[WebRTC] Received remote audio stream from $remoteId');
         _remoteStreams[remoteId] = event.streams[0];
       }
     };
 
     pc.onConnectionState = (state) {
-      print('[WebRTC] Connection state with $remoteId: $state');
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
         _closeConnection(remoteId);
@@ -184,7 +176,6 @@ class WebRTCService {
   }
 
   void _closeConnection(String remoteId) {
-    print('[WebRTC] Closing connection with $remoteId');
     _peerConnections[remoteId]?.dispose();
     _peerConnections.remove(remoteId);
     _remoteStreams.remove(remoteId);
@@ -225,8 +216,6 @@ class WebRTCService {
     final fromId = signal['from_player_id'] as String;
     final type = signal['signal_type'] as String;
     final data = signal['signal_data'] as String;
-
-    print('[WebRTC] Processing $type signal from $fromId');
 
     try {
       if (type == 'offer') {
@@ -271,9 +260,7 @@ class WebRTCService {
           _pendingCandidates.putIfAbsent(fromId, () => []).add(candidate);
         }
       }
-    } catch (e) {
-      print('[WebRTC] Signal handling error: $e');
-    }
+    } catch (e) {}
   }
 
   /// Enable/Disable local microphone (Push-to-Talk)
@@ -281,18 +268,29 @@ class WebRTCService {
     if (!_isInitialized) await initialize();
 
     _isMicMuted = !isOn;
+
+    // Update local stream tracks
     if (_localStream != null) {
       for (var track in _localStream!.getAudioTracks()) {
         track.enabled = isOn;
       }
     }
+
+    // Also update tracks on all existing peer connection senders
+    for (final pc in _peerConnections.values) {
+      final senders = await pc.getSenders();
+      for (final sender in senders) {
+        if (sender.track?.kind == 'audio') {
+          sender.track!.enabled = isOn;
+        }
+      }
+    }
+
     _micStateController.add(isOn);
-    print('[WebRTC] Local mic ${isOn ? 'UNMUTED' : 'MUTED'}');
   }
 
   /// Reset all connections (e.g., when leaving lobby/game)
   Future<void> leaveRoom() async {
-    print('[WebRTC] Resetting service');
     stopPolling();
 
     for (var pc in _peerConnections.values) {

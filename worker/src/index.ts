@@ -136,7 +136,7 @@ async function handleCreateRoom(request: Request, env: Env): Promise<Response> {
     });
   }
   const now = new Date().toISOString();
-  console.log('[room.create]', JSON.stringify({ roomCode, playerId }));
+
 
   const gameState: GameState = {
     drawPile: [],
@@ -226,12 +226,10 @@ async function handleJoinRoom(request: Request, env: Env): Promise<Response> {
     const code = roomCode.toUpperCase();
     const now = new Date().toISOString();
 
-    // 1) VALIDATE room exists BEFORE any insert
     const roomRow = await env.DB.prepare('SELECT code, state_version FROM rooms WHERE code = ?')
       .bind(code)
       .first<{ code: string; state_version: number }>();
 
-    // 2) If null → return ROOM_NOT_FOUND
     if (!roomRow) {
       return new Response(JSON.stringify({ error: 'ROOM_NOT_FOUND' }), {
         status: 404,
@@ -239,15 +237,11 @@ async function handleJoinRoom(request: Request, env: Env): Promise<Response> {
       });
     }
 
-    // 3) CHECK if player already exists (idempotent retry handling)
     const existingPlayer = await env.DB.prepare('SELECT id FROM players WHERE id = ? AND room_code = ?')
       .bind(playerId, code)
       .first<{ id: string }>();
 
-    let isNewJoin = false;
-
     if (!existingPlayer) {
-      // 4) INSERT player (new join) - use INSERT OR IGNORE for safety
       try {
         await env.DB.prepare(
           `INSERT INTO players (id, room_code, name, is_host, is_spectator, seat_number, hand_json, card_count, last_seen)
@@ -265,45 +259,30 @@ async function handleJoinRoom(request: Request, env: Env): Promise<Response> {
             now,
           )
           .run();
-        isNewJoin = true;
       } catch (insertError: any) {
-        // If duplicate key error, player was inserted between check and insert (race condition)
-        // Check again to see if it exists now
         const raceCheck = await env.DB.prepare('SELECT id FROM players WHERE id = ? AND room_code = ?')
           .bind(playerId, code)
           .first<{ id: string }>();
 
         if (!raceCheck) {
-          // Real error, re-throw with context
           throw new Error(`Failed to insert player: ${insertError.message}`);
         }
-        // Player exists now, treat as existing join
-        isNewJoin = false;
       }
     } else {
-      // Player exists - update last_seen for heartbeat
       await env.DB.prepare('UPDATE players SET last_seen = ?, name = ? WHERE id = ? AND room_code = ?')
         .bind(now, playerName, playerId, code)
         .run();
     }
 
-    // 5) Increment state_version ONLY after successful new join (wakes host poll)
-    if (isNewJoin) {
-      await env.DB.prepare('UPDATE rooms SET state_version = state_version + 1, last_activity = ? WHERE code = ?')
-        .bind(now, code)
-        .run();
-    }
+    // Always increment state version to ensure host gets the update
+    await env.DB.prepare('UPDATE rooms SET state_version = state_version + 1, last_activity = ? WHERE code = ?')
+      .bind(now, code)
+      .run();
 
-    // 6) RETURN success
-    console.log('[room.join]', JSON.stringify({ roomCode: code, playerId, isNewJoin }));
     return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('[room.join.error]', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
     return new Response(JSON.stringify({ error: 'INTERNAL_ERROR' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -330,7 +309,7 @@ async function handleLeaveRoom(request: Request, env: Env): Promise<Response> {
     }
 
     if (player.is_host) {
-      console.log('[room.leave]', JSON.stringify({ roomCode: code, playerId, isHost: true }));
+
       await env.DB.prepare('DELETE FROM players WHERE room_code = ?')
         .bind(code)
         .run();
@@ -348,7 +327,7 @@ async function handleLeaveRoom(request: Request, env: Env): Promise<Response> {
       });
     }
 
-    console.log('[room.leave]', JSON.stringify({ roomCode: code, playerId, isHost: false }));
+
     await env.DB.prepare('DELETE FROM players WHERE id = ? AND room_code = ?')
       .bind(playerId, code)
       .run();
@@ -387,7 +366,7 @@ async function handleLeaveRoom(request: Request, env: Env): Promise<Response> {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('[room.leave.error]', error);
+
     return new Response(JSON.stringify({ error: 'INTERNAL_ERROR' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -1008,22 +987,8 @@ async function handlePoll(code: string, searchParams: URLSearchParams, env: Env)
   const lastKnownVersion = parseInt(searchParams.get('lastKnownVersion') || '0', 10);
   const isSpectator = searchParams.get('isSpectator') === 'true';
 
-  console.log('[poll.entry]', JSON.stringify({ roomCode: code.toUpperCase(), playerId, lastKnownVersion, isSpectator }));
   try {
-    const room = await getRoomWithPlayers(code.toUpperCase(), env);
-
-    if (!room) {
-      console.log('[poll.exit]', JSON.stringify({ roomCode: code.toUpperCase(), reason: 'ROOM_DELETED_NOT_FOUND' }));
-      return new Response(JSON.stringify({
-        type: 'ROOM_DELETED',
-        reason: 'NOT_FOUND',
-        events: [createEvent(GameEventType.ROOM_DELETED, playerId || undefined, { reason: 'NOT_FOUND' })],
-      }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const currentVersion = room.gameState?.stateVersion ?? 0;
+    // First check if room exists and get its state_version
     const roomStateVersion = await env.DB.prepare('SELECT state_version FROM rooms WHERE code = ?')
       .bind(code.toUpperCase())
       .first<{ state_version: number }>();
@@ -1038,39 +1003,28 @@ async function handlePoll(code: string, searchParams: URLSearchParams, env: Env)
       });
     }
 
-    if (currentVersion <= lastKnownVersion && roomStateVersion.state_version <= lastKnownVersion) {
-      const maxWait = isSpectator ? 5 : 15;
-      const checkInterval = isSpectator ? 2000 : 1000;
+    // If room has changed, return immediately
+    if (roomStateVersion.state_version > lastKnownVersion) {
+      const room = await getRoomWithPlayers(code.toUpperCase(), env);
+      if (room) {
+        return new Response(JSON.stringify(room), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
-      for (let i = 0; i < maxWait; i++) {
-        await new Promise(resolve => setTimeout(resolve, checkInterval));
-        try {
-          const roomData = await env.DB.prepare('SELECT state_version FROM rooms WHERE code = ?')
-            .bind(code.toUpperCase())
-            .first<{ state_version: number }>();
+    // Long poll: wait for changes
+    const maxWait = isSpectator ? 5 : 15;
+    const checkInterval = isSpectator ? 2000 : 1000;
 
-          if (!roomData) {
-            console.log('[poll.exit]', JSON.stringify({ roomCode: code.toUpperCase(), reason: 'ROOM_DELETED_NOT_FOUND' }));
-            return new Response(JSON.stringify({
-              type: 'ROOM_DELETED',
-              reason: 'NOT_FOUND',
-              events: [createEvent(GameEventType.ROOM_DELETED, playerId || undefined, { reason: 'NOT_FOUND' })],
-            }), {
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
+    for (let i = 0; i < maxWait; i++) {
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
+      try {
+        const roomData = await env.DB.prepare('SELECT state_version FROM rooms WHERE code = ?')
+          .bind(code.toUpperCase())
+          .first<{ state_version: number }>();
 
-          if (roomData.state_version > lastKnownVersion) {
-            const updatedRoom = await getRoomWithPlayers(code.toUpperCase(), env);
-            if (updatedRoom) {
-              console.log('[poll.exit]', JSON.stringify({ roomCode: code.toUpperCase(), changed: true }));
-              return new Response(JSON.stringify(updatedRoom), {
-                headers: { 'Content-Type': 'application/json' },
-              });
-            }
-          }
-        } catch (e) {
-          console.log('[poll.exit]', JSON.stringify({ roomCode: code.toUpperCase(), reason: 'EXCEPTION_LOOP' }));
+        if (!roomData) {
           return new Response(JSON.stringify({
             type: 'ROOM_DELETED',
             reason: 'NOT_FOUND',
@@ -1079,21 +1033,31 @@ async function handlePoll(code: string, searchParams: URLSearchParams, env: Env)
             headers: { 'Content-Type': 'application/json' },
           });
         }
-      }
 
-      console.log('[poll.exit]', JSON.stringify({ roomCode: code.toUpperCase(), changed: false, reason: 'TIMEOUT' }));
-      return new Response(JSON.stringify({ changed: false }), {
-        status: 304,
-        headers: { 'Content-Type': 'application/json' },
-      });
+        if (roomData.state_version > lastKnownVersion) {
+          const updatedRoom = await getRoomWithPlayers(code.toUpperCase(), env);
+          if (updatedRoom) {
+            return new Response(JSON.stringify(updatedRoom), {
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+        }
+      } catch (e) {
+        return new Response(JSON.stringify({
+          type: 'ROOM_DELETED',
+          reason: 'NOT_FOUND',
+          events: [createEvent(GameEventType.ROOM_DELETED, playerId || undefined, { reason: 'NOT_FOUND' })],
+        }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
 
-    console.log('[poll.exit]', JSON.stringify({ roomCode: code.toUpperCase(), changed: true }));
-    return new Response(JSON.stringify(room), {
+    return new Response(JSON.stringify({ changed: false }), {
+      status: 304,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    console.log('[poll.exit]', JSON.stringify({ roomCode: code.toUpperCase(), changed: false, reason: 'EXCEPTION' }));
     return new Response(JSON.stringify({
       type: 'ROOM_DELETED',
       reason: 'NOT_FOUND',
@@ -1105,6 +1069,7 @@ async function handlePoll(code: string, searchParams: URLSearchParams, env: Env)
 }
 
 async function handleHeartbeat(request: Request, env: Env): Promise<Response> {
+
   const body = await request.json() as { roomCode: string; playerId: string };
   const { roomCode, playerId } = body;
 
@@ -1212,6 +1177,7 @@ async function getRoomWithPlayers(roomCode: string, env: Env): Promise<Room | nu
     gameState,
     players,
     lastActivity: roomData.last_activity,
+    stateVersion: roomData.state_version,
   };
 }
 

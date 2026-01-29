@@ -83,16 +83,20 @@ class GameState {
     final lastActivityStr = json['lastActivity'] as String?;
     final activeColorStr = json['activeColor'] as String?;
     final winnerTimestampStr = json['winnerTimestamp'] as String?;
-    
+
     return GameState(
-      drawPile: (json['drawPile'] as List<dynamic>?)
-          ?.whereType<Map<String, dynamic>>()
-          .map((c) => UnoCard.fromJson(c))
-          .toList() ?? [],
-      discardPile: (json['discardPile'] as List<dynamic>?)
-          ?.whereType<Map<String, dynamic>>()
-          .map((c) => UnoCard.fromJson(c))
-          .toList() ?? [],
+      drawPile:
+          (json['drawPile'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((c) => UnoCard.fromJson(c))
+              .toList() ??
+          [],
+      discardPile:
+          (json['discardPile'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((c) => UnoCard.fromJson(c))
+              .toList() ??
+          [],
       activeColor: CardColor.values.firstWhere(
         (e) => e.name == (activeColorStr ?? 'red'),
         orElse: () => CardColor.red,
@@ -102,21 +106,24 @@ class GameState {
       pendingDrawCount: json['pendingDrawCount'] as int? ?? 0,
       lastPlayedCardJson: json['lastPlayedCardJson'] as String?,
       pendingWildColorChoice: json['pendingWildColorChoice'] as String?,
-      unoCalled: json['unoCalled'] != null && json['unoCalled'] is Map
-          ? Map<String, bool>.from(
-              (json['unoCalled'] as Map).map(
-                (k, v) => MapEntry(k.toString(), v is bool ? v : false),
-              ),
-            )
-          : {},
+      unoCalled:
+          json['unoCalled'] != null && json['unoCalled'] is Map
+              ? Map<String, bool>.from(
+                (json['unoCalled'] as Map).map(
+                  (k, v) => MapEntry(k.toString(), v is bool ? v : false),
+                ),
+              )
+              : {},
       stateVersion: json['stateVersion'] as int? ?? 0,
-      lastActivity: lastActivityStr != null 
-          ? (DateTime.tryParse(lastActivityStr) ?? DateTime.now())
-          : DateTime.now(),
+      lastActivity:
+          lastActivityStr != null
+              ? (DateTime.tryParse(lastActivityStr) ?? DateTime.now())
+              : DateTime.now(),
       winnerPlayerId: json['winnerPlayerId'] as String?,
-      winnerTimestamp: winnerTimestampStr != null
-          ? DateTime.tryParse(winnerTimestampStr)
-          : null,
+      winnerTimestamp:
+          winnerTimestampStr != null
+              ? DateTime.tryParse(winnerTimestampStr)
+              : null,
       lastPlayedCardAnimationId: json['lastPlayedCardAnimationId'] as String?,
     );
   }
@@ -145,13 +152,15 @@ class GameState {
       direction: direction ?? this.direction,
       pendingDrawCount: pendingDrawCount ?? this.pendingDrawCount,
       lastPlayedCardJson: lastPlayedCardJson ?? this.lastPlayedCardJson,
-      pendingWildColorChoice: pendingWildColorChoice ?? this.pendingWildColorChoice,
+      pendingWildColorChoice:
+          pendingWildColorChoice ?? this.pendingWildColorChoice,
       unoCalled: unoCalled ?? this.unoCalled,
       stateVersion: stateVersion ?? this.stateVersion,
       lastActivity: lastActivity ?? this.lastActivity,
       winnerPlayerId: winnerPlayerId ?? this.winnerPlayerId,
       winnerTimestamp: winnerTimestamp ?? this.winnerTimestamp,
-      lastPlayedCardAnimationId: lastPlayedCardAnimationId ?? this.lastPlayedCardAnimationId,
+      lastPlayedCardAnimationId:
+          lastPlayedCardAnimationId ?? this.lastPlayedCardAnimationId,
     );
   }
 }
@@ -171,7 +180,7 @@ enum GameEventType {
   forceResync;
 
   String get name => toString().split('.').last.toUpperCase();
-  
+
   static GameEventType? fromString(String value) {
     try {
       return GameEventType.values.firstWhere(
@@ -203,18 +212,22 @@ class GameEvent {
     final typeStr = json['type'] as String?;
     final timestampStr = json['timestamp'] as String?;
     final eventId = json['eventId'] as String?;
-    
+
     return GameEvent(
-      type: typeStr != null 
-          ? (GameEventType.fromString(typeStr) ?? GameEventType.animationEvent)
-          : GameEventType.animationEvent,
+      type:
+          typeStr != null
+              ? (GameEventType.fromString(typeStr) ??
+                  GameEventType.animationEvent)
+              : GameEventType.animationEvent,
       playerId: json['playerId'] as String?,
-      data: json['data'] != null && json['data'] is Map
-          ? Map<String, dynamic>.from(json['data'] as Map)
-          : null,
-      timestamp: timestampStr != null
-          ? (DateTime.tryParse(timestampStr) ?? DateTime.now())
-          : DateTime.now(),
+      data:
+          json['data'] != null && json['data'] is Map
+              ? Map<String, dynamic>.from(json['data'] as Map)
+              : null,
+      timestamp:
+          timestampStr != null
+              ? (DateTime.tryParse(timestampStr) ?? DateTime.now())
+              : DateTime.now(),
       eventId: eventId ?? DateTime.now().millisecondsSinceEpoch.toString(),
     );
   }
@@ -234,6 +247,7 @@ class Room {
   final List<Player> players;
   final DateTime lastActivity;
   final List<GameEvent>? events;
+  final int stateVersion;
 
   Room({
     required this.code,
@@ -243,9 +257,11 @@ class Room {
     required this.players,
     required this.lastActivity,
     this.events,
+    required this.stateVersion,
   });
 
-  Player? get host => players.firstWhere((p) => p.id == hostId, orElse: () => players.first);
+  Player? get host =>
+      players.firstWhere((p) => p.id == hostId, orElse: () => players.first);
 
   Map<String, dynamic> toJson() {
     return {
@@ -255,13 +271,19 @@ class Room {
       'gameState': gameState?.toJson(),
       'players': players.map((p) => p.toJson()).toList(),
       'lastActivity': lastActivity.toIso8601String(),
-      'events': events?.map((e) => {
-        'type': e.type.name,
-        'playerId': e.playerId,
-        'data': e.data,
-        'timestamp': e.timestamp.toIso8601String(),
-        'eventId': e.eventId,
-      }).toList(),
+      'stateVersion': stateVersion,
+      'events':
+          events
+              ?.map(
+                (e) => {
+                  'type': e.type.name,
+                  'playerId': e.playerId,
+                  'data': e.data,
+                  'timestamp': e.timestamp.toIso8601String(),
+                  'eventId': e.eventId,
+                },
+              )
+              .toList(),
     };
   }
 
@@ -271,11 +293,13 @@ class Room {
     final hostId = json['hostId'] as String?;
     final statusStr = json['status'] as String?;
     final lastActivityStr = json['lastActivity'] as String?;
-    
+
     if (code == null || hostId == null || lastActivityStr == null) {
-      throw FormatException('Missing required fields in Room JSON: code=$code, hostId=$hostId, lastActivity=$lastActivityStr');
+      throw FormatException(
+        'Missing required fields in Room JSON: code=$code, hostId=$hostId, lastActivity=$lastActivityStr',
+      );
     }
-    
+
     return Room(
       code: code,
       hostId: hostId,
@@ -283,20 +307,25 @@ class Room {
         (e) => e.name == (statusStr ?? 'lobby'),
         orElse: () => RoomStatus.lobby,
       ),
-      gameState: json['gameState'] != null && json['gameState'] is Map<String, dynamic>
-          ? GameState.fromJson(json['gameState'] as Map<String, dynamic>)
-          : null,
-      players: (json['players'] as List<dynamic>?)
-          ?.whereType<Map<String, dynamic>>()
-          .map((p) => Player.fromJson(p))
-          .toList() ?? [],
+      gameState:
+          json['gameState'] != null && json['gameState'] is Map<String, dynamic>
+              ? GameState.fromJson(json['gameState'] as Map<String, dynamic>)
+              : null,
+      players:
+          (json['players'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((p) => Player.fromJson(p))
+              .toList() ??
+          [],
       lastActivity: DateTime.tryParse(lastActivityStr) ?? DateTime.now(),
-      events: json['events'] != null && json['events'] is List<dynamic>
-          ? (json['events'] as List<dynamic>)
-              .whereType<Map<String, dynamic>>()
-              .map((e) => GameEvent.fromJson(e))
-              .toList()
-          : null,
+      stateVersion: json['stateVersion'] as int? ?? 0,
+      events:
+          json['events'] != null && json['events'] is List<dynamic>
+              ? (json['events'] as List<dynamic>)
+                  .whereType<Map<String, dynamic>>()
+                  .map((e) => GameEvent.fromJson(e))
+                  .toList()
+              : null,
     );
   }
 }

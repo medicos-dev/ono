@@ -88,5 +88,6 @@ export interface Room {
   gameState: GameState | null;
   players: Player[];
   lastActivity: string;
+  stateVersion: number;
   events?: GameEvent[];
 }

@@ -271,7 +271,7 @@ class RoomProvider with ChangeNotifier {
         return;
       }
 
-      final lastVersion = _room!.gameState?.stateVersion ?? 0;
+      final lastVersion = _room!.stateVersion;
       final isSpectator = _currentPlayer!.isSpectator;
       final updatedRoom = await _apiService.pollRoom(
         _room!.code,
