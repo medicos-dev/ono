@@ -470,4 +470,19 @@ class IsarService {
       }
     } catch (e) {}
   }
+
+  /// Clears entire Isar storage (all collections). Call on app launch if desired.
+  static Future<void> clearAllStorage() async {
+    try {
+      await instance.writeTxn(() async {
+        await instance.gameStateSnapshots.clear();
+        await instance.discardPileCards.clear();
+        await instance.playerSnapshots.clear();
+        await instance.playerHands.clear();
+        await instance.gameEvents.clear();
+        await instance.syncMetadatas.clear();
+        await instance.consumedAnimationIds.clear();
+      });
+    } catch (e) {}
+  }
 }

@@ -505,6 +505,7 @@ async function handleStartGame(request: Request, env: Env): Promise<Response> {
   const hostPlayer = activePlayers[0];
   const playerIdsOrdered = await getPlayerIds(roomCode.toUpperCase(), env);
 
+  const newStateVersion = roomData.state_version + 1;
   const initialGameState: GameState = {
     drawPile: deck,
     discardPile: [],
@@ -515,7 +516,7 @@ async function handleStartGame(request: Request, env: Env): Promise<Response> {
     lastPlayedCardJson: null,
     pendingWildColorChoice: null,
     unoCalled: {},
-    stateVersion: roomData.state_version,
+    stateVersion: newStateVersion,
     lastActivity: new Date().toISOString(),
     winnerPlayerId: null,
     winnerTimestamp: null,
@@ -533,7 +534,7 @@ async function handleStartGame(request: Request, env: Env): Promise<Response> {
       initialGameState.direction,
       initialGameState.activeColor,
       initialGameState.pendingDrawCount,
-      initialGameState.stateVersion,
+      newStateVersion,
       initialGameState.lastActivity,
       roomCode.toUpperCase(),
     )

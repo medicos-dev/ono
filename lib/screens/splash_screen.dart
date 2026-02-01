@@ -7,6 +7,7 @@ import '../providers/room_provider.dart';
 import '../providers/game_provider.dart';
 import '../widgets/app_toast.dart';
 import '../theme/app_theme.dart';
+import '../services/isar_service.dart';
 import 'home_screen.dart';
 
 /// Animated splash screen with ONO logo and "By Aiks..." text
@@ -199,6 +200,10 @@ class _SplashScreenState extends State<SplashScreen>
     print('SplashScreen: Starting initialization');
 
     try {
+      print('SplashScreen: Step 0 - Clearing Isar storage');
+      await IsarService.clearAllStorage();
+      print('SplashScreen: Isar storage cleared');
+
       print('SplashScreen: Step 1 - Loading environment');
       try {
         await dotenv.load(fileName: '.env');

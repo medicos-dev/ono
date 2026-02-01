@@ -51,11 +51,13 @@ class Player {
     final name = json['name'] as String?;
     final roomCode = json['roomCode'] as String?;
     final lastSeenStr = json['lastSeen'] as String?;
-    
-    if (id == null || name == null || roomCode == null || lastSeenStr == null) {
-      throw FormatException('Missing required fields in Player JSON: id=$id, name=$name, roomCode=$roomCode, lastSeen=$lastSeenStr');
+
+    if (id == null || name == null || roomCode == null) {
+      throw FormatException(
+        'Missing required fields in Player JSON: id=$id, name=$name, roomCode=$roomCode',
+      );
     }
-    
+
     return Player(
       id: id,
       name: name,
@@ -64,10 +66,13 @@ class Player {
       isSpectator: json['isSpectator'] as bool? ?? false,
       seatNumber: json['seatNumber'] as int?,
       hand: (json['hand'] as List<dynamic>?)
-          ?.whereType<Map<String, dynamic>>()
-          .map((c) => UnoCard.fromJson(c))
-          .toList() ?? [],
-      lastSeen: DateTime.tryParse(lastSeenStr) ?? DateTime.now(),
+              ?.whereType<Map<String, dynamic>>()
+              .map((c) => UnoCard.fromJson(c))
+              .toList() ??
+          [],
+      lastSeen: lastSeenStr != null
+          ? (DateTime.tryParse(lastSeenStr) ?? DateTime.now())
+          : DateTime.now(),
     );
   }
 

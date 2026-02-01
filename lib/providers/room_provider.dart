@@ -131,19 +131,17 @@ class RoomProvider with ChangeNotifier {
         );
       }
 
-      await IsarService.writeRoomSnapshot(joinedRoom);
-      final cachedRoom = await IsarService.getCachedRoom(joinedRoom.code);
-      if (cachedRoom != null) {
-        _room = cachedRoom;
-        try {
-          _currentPlayer =
-              cachedRoom.players.firstWhere((p) => p.id == playerId);
-        } catch (_) {
-          throw Exception(
-            'Joined room but player is missing from room snapshot.',
-          );
-        }
+      _room = joinedRoom;
+      try {
+        _currentPlayer =
+            joinedRoom.players.firstWhere((p) => p.id == playerId);
+      } catch (_) {
+        throw Exception(
+          'Joined room but you are not in the player list yet. Please wait and try again.',
+        );
       }
+
+      await IsarService.writeRoomSnapshot(joinedRoom);
 
       _startPolling();
       _startHeartbeat();
