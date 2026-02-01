@@ -191,17 +191,13 @@ class RoomProvider with ChangeNotifier {
   void _subscribeToIsarUpdates(String roomCode) {
     _isarSubscription?.cancel();
     _isarSubscription = IsarService.watchRoom(roomCode).listen((room) {
+      if (room.players.isEmpty) return;
       _room = room;
       if (_currentPlayer != null) {
-        _currentPlayer = room.players.firstWhere(
-          (p) => p.id == _currentPlayer!.id,
-          orElse: () => _currentPlayer!,
-        );
+        final idx = room.players.indexWhere((p) => p.id == _currentPlayer!.id);
+        if (idx >= 0) _currentPlayer = room.players[idx];
       }
-      if (_room != null) {
-        // Update WebRTC mesh connections
-        WebRTCService().onPlayersChanged(_room!.players);
-      }
+      WebRTCService().onPlayersChanged(room.players);
       notifyListeners();
     });
   }
@@ -212,9 +208,12 @@ class RoomProvider with ChangeNotifier {
     try {
       _error = null;
       _room = await _apiService.resignHost(_room!.code, _currentPlayer!.id);
-      _currentPlayer = _room!.players.firstWhere(
-        (p) => p.id == _currentPlayer!.id,
-      );
+      if (_room!.players.isNotEmpty) {
+        final idx = _room!.players.indexWhere(
+          (p) => p.id == _currentPlayer!.id,
+        );
+        if (idx >= 0) _currentPlayer = _room!.players[idx];
+      }
       notifyListeners();
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -229,9 +228,12 @@ class RoomProvider with ChangeNotifier {
     try {
       _error = null;
       _room = await _apiService.startGame(_room!.code, _currentPlayer!.id);
-      _currentPlayer = _room!.players.firstWhere(
-        (p) => p.id == _currentPlayer!.id,
-      );
+      if (_room!.players.isNotEmpty) {
+        final idx = _room!.players.indexWhere(
+          (p) => p.id == _currentPlayer!.id,
+        );
+        if (idx >= 0) _currentPlayer = _room!.players[idx];
+      }
       notifyListeners();
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -303,15 +305,12 @@ class RoomProvider with ChangeNotifier {
             playersChanged ||
             statusChanged ||
             hasEvents) {
-          // IMMEDIATE MEMORY UPDATE (The "Total Remake")
-          // Bypass Isar cache for UI updates to ensure 100% responsiveness
           _room = updatedRoom;
-
-          if (_currentPlayer != null) {
-            _currentPlayer = updatedRoom.players.firstWhere(
+          if (_currentPlayer != null && updatedRoom.players.isNotEmpty) {
+            final idx = updatedRoom.players.indexWhere(
               (p) => p.id == _currentPlayer!.id,
-              orElse: () => _currentPlayer!,
             );
+            if (idx >= 0) _currentPlayer = updatedRoom.players[idx];
           }
 
           if (newVersion > _lastNotifiedVersion ||
@@ -372,13 +371,13 @@ class RoomProvider with ChangeNotifier {
           await IsarService.instance.syncMetadatas.put(metadata);
         }
         final cachedRoom = await IsarService.getCachedRoom(updatedRoom.code);
-        if (cachedRoom != null) {
+        if (cachedRoom != null && cachedRoom.players.isNotEmpty) {
           _room = cachedRoom;
           if (_currentPlayer != null) {
-            _currentPlayer = cachedRoom.players.firstWhere(
+            final idx = cachedRoom.players.indexWhere(
               (p) => p.id == _currentPlayer!.id,
-              orElse: () => _currentPlayer!,
             );
+            if (idx >= 0) _currentPlayer = cachedRoom.players[idx];
           }
           notifyListeners();
         }
@@ -386,7 +385,7 @@ class RoomProvider with ChangeNotifier {
     } on RoomDeletedException catch (e) {
       await _handleRoomDeleted(e.reason);
     } catch (e) {
-      await IsarService.markNeedsFullSync(_room!.code);
+      if (_room != null) IsarService.markNeedsFullSync(_room!.code);
     }
   }
 
@@ -451,30 +450,17 @@ class RoomProvider with ChangeNotifier {
   Future<void> updateRoomState(Room room) async {
     await IsarService.writeRoomSnapshot(room);
     final cachedRoom = await IsarService.getCachedRoom(room.code);
-    if (cachedRoom != null) {
-      final newVersion = cachedRoom.gameState?.stateVersion ?? 0;
-      if (newVersion > _lastNotifiedVersion ||
-          _room == null ||
-          cachedRoom.players.length != _room!.players.length ||
-          cachedRoom.status != _room!.status) {
-        _room = cachedRoom;
-        if (_currentPlayer != null) {
-          _currentPlayer = cachedRoom.players.firstWhere(
-            (p) => p.id == _currentPlayer!.id,
-            orElse: () => _currentPlayer!,
-          );
-        }
-        _lastNotifiedVersion = newVersion;
-        notifyListeners();
-      } else {
-        _room = cachedRoom;
-        if (_currentPlayer != null) {
-          _currentPlayer = cachedRoom.players.firstWhere(
-            (p) => p.id == _currentPlayer!.id,
-            orElse: () => _currentPlayer!,
-          );
-        }
+    if (cachedRoom != null && cachedRoom.players.isNotEmpty) {
+      _room = cachedRoom;
+      if (_currentPlayer != null) {
+        final idx = cachedRoom.players.indexWhere(
+          (p) => p.id == _currentPlayer!.id,
+        );
+        if (idx >= 0) _currentPlayer = cachedRoom.players[idx];
       }
+      final newVersion = cachedRoom.gameState?.stateVersion ?? 0;
+      if (newVersion > _lastNotifiedVersion) _lastNotifiedVersion = newVersion;
+      notifyListeners();
     }
   }
 

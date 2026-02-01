@@ -87,6 +87,7 @@ class IsarService {
       final hands = results[3] as List<isar_models.PlayerHand>;
 
       if (snapshot == null) return null;
+      if (players.isEmpty) return null;
 
       final handByPlayerId = <String, isar_models.PlayerHand>{
         for (final h in hands) h.playerId: h,
@@ -172,12 +173,14 @@ class IsarService {
         );
       }
 
+      if (playerList.isEmpty) return null;
+      final hostPlayer = playerList.firstWhere(
+        (p) => p.isHost,
+        orElse: () => playerList.first,
+      );
       return Room(
         code: roomCode,
-        hostId:
-            playerList
-                .firstWhere((p) => p.isHost, orElse: () => playerList.first)
-                .id,
+        hostId: hostPlayer.id,
         status: roomStatus,
         gameState: gameState,
         players: playerList,

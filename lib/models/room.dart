@@ -287,6 +287,34 @@ class Room {
     };
   }
 
+  static List<GameEvent> _parseEventsSafe(dynamic eventsJson) {
+    if (eventsJson == null || eventsJson is! List) return [];
+    final out = <GameEvent>[];
+    for (final e in eventsJson) {
+      if (e is! Map<String, dynamic>) continue;
+      try {
+        out.add(GameEvent.fromJson(e));
+      } catch (_) {
+        continue;
+      }
+    }
+    return out;
+  }
+
+  static List<Player> _parsePlayersSafe(dynamic playersJson) {
+    if (playersJson == null || playersJson is! List) return [];
+    final out = <Player>[];
+    for (final p in playersJson) {
+      if (p is! Map<String, dynamic>) continue;
+      try {
+        out.add(Player.fromJson(p));
+      } catch (_) {
+        continue;
+      }
+    }
+    return out;
+  }
+
   factory Room.fromJson(Map<String, dynamic> json) {
     // Safe null handling - never force cast network data
     final code = json['code'] as String?;
@@ -311,21 +339,10 @@ class Room {
           json['gameState'] != null && json['gameState'] is Map<String, dynamic>
               ? GameState.fromJson(json['gameState'] as Map<String, dynamic>)
               : null,
-      players:
-          (json['players'] as List<dynamic>?)
-              ?.whereType<Map<String, dynamic>>()
-              .map((p) => Player.fromJson(p))
-              .toList() ??
-          [],
+      players: _parsePlayersSafe(json['players']),
       lastActivity: DateTime.tryParse(lastActivityStr) ?? DateTime.now(),
       stateVersion: json['stateVersion'] as int? ?? 0,
-      events:
-          json['events'] != null && json['events'] is List<dynamic>
-              ? (json['events'] as List<dynamic>)
-                  .whereType<Map<String, dynamic>>()
-                  .map((e) => GameEvent.fromJson(e))
-                  .toList()
-              : null,
+      events: _parseEventsSafe(json['events']),
     );
   }
 }

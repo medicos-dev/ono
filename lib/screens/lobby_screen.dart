@@ -202,7 +202,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
           }
         }
 
-        if (room == null || currentPlayer == null) {
+        if (room == null ||
+            currentPlayer == null ||
+            room.players.isEmpty) {
           return const Scaffold(
             backgroundColor: Color(0xFF0A0A0F),
             body: Center(child: CircularProgressIndicator()),
