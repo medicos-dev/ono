@@ -59,24 +59,35 @@ class RoomProvider with ChangeNotifier {
       // Clear any stale cache for this room
       await IsarService.clearRoomData(roomCode.toUpperCase());
       final room = await _apiService.createRoom(playerName, playerId, roomCode);
-      await IsarService.writeRoomSnapshot(room);
-      _room = await IsarService.getCachedRoom(room.code);
-      if (_room != null) {
-        _currentPlayer = _room!.players.firstWhere((p) => p.id == playerId);
+
+      // IMMEDIATE MEMORY UPDATE (Safe Create Remake)
+      _room = room;
+      try {
+        _currentPlayer = room.players.firstWhere((p) => p.id == playerId);
+      } catch (_) {
+        throw Exception('Created room but host is missing from room snapshot.');
       }
+
       await StorageService.savePlayerName(playerName);
       await StorageService.saveRoomCode(room.code);
       _startPolling();
       _startHeartbeat();
 
-      // Initialize WebRTC
-      await WebRTCService().joinRoom(room.code, playerId);
-      if (_room != null) {
-        WebRTCService().onPlayersChanged(_room!.players);
+      // Initialize WebRTC Safely
+      try {
+        await WebRTCService().joinRoom(room.code, playerId);
+        if (_room != null) {
+          WebRTCService().onPlayersChanged(_room!.players);
+        }
+      } catch (rtcError) {
+        debugPrint('WebRTC Init Failed (Non-Fatal): $rtcError');
       }
 
       _subscribeToIsarUpdates(room.code);
       notifyListeners();
+
+      // Persist to local storage in background
+      IsarService.writeRoomSnapshot(room).ignore();
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
       notifyListeners();
@@ -97,47 +108,54 @@ class RoomProvider with ChangeNotifier {
         );
       }
 
-      // Clear any stale cache for this room before joining
       await IsarService.clearRoomData(roomCode.toUpperCase());
 
-      // Join room and get authoritative state immediately
-      final joinedRoom = await _apiService.joinRoom(
+      await _apiService.joinRoom(
         roomCode.toUpperCase(),
         playerName,
         playerId,
       );
 
-      // Save player name and room code for polling
       await StorageService.savePlayerName(playerName);
       await StorageService.saveRoomCode(roomCode.toUpperCase());
 
-      // Persist and hydrate local room state from the polled snapshot
+      final joinedRoom = await _apiService.pollRoom(
+        roomCode.toUpperCase(),
+        lastKnownVersion: 0,
+        isSpectator: false,
+      );
+
+      if (joinedRoom == null) {
+        throw Exception(
+          'Could not load room after join. Please try again.',
+        );
+      }
+
       await IsarService.writeRoomSnapshot(joinedRoom);
       final cachedRoom = await IsarService.getCachedRoom(joinedRoom.code);
       if (cachedRoom != null) {
         _room = cachedRoom;
         try {
-          _currentPlayer = cachedRoom.players.firstWhere(
-            (p) => p.id == playerId,
-          );
+          _currentPlayer =
+              cachedRoom.players.firstWhere((p) => p.id == playerId);
         } catch (_) {
-          // If player not found in snapshot, treat as fatal for this join
           throw Exception(
             'Joined room but player is missing from room snapshot.',
           );
         }
       }
 
-      // Start ongoing polling and heartbeat after we have a valid room snapshot
       _startPolling();
       _startHeartbeat();
 
-      // Initialize WebRTC
-      await WebRTCService().joinRoom(joinedRoom.code, playerId);
-      WebRTCService().onPlayersChanged(joinedRoom.players);
+      try {
+        await WebRTCService().joinRoom(joinedRoom.code, playerId);
+        WebRTCService().onPlayersChanged(joinedRoom.players);
+      } catch (rtcError) {
+        debugPrint('WebRTC Init Failed (Non-Fatal): $rtcError');
+      }
 
       _subscribeToIsarUpdates(joinedRoom.code);
-
       notifyListeners();
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
@@ -287,23 +305,37 @@ class RoomProvider with ChangeNotifier {
             playersChanged ||
             statusChanged ||
             hasEvents) {
-          await IsarService.writeRoomSnapshot(updatedRoom);
-          final cachedRoom = await IsarService.getCachedRoom(updatedRoom.code);
-          if (cachedRoom != null) {
-            _room = cachedRoom;
-            if (_currentPlayer != null) {
-              _currentPlayer = cachedRoom.players.firstWhere(
-                (p) => p.id == _currentPlayer!.id,
-                orElse: () => _currentPlayer!,
-              );
+          // IMMEDIATE MEMORY UPDATE (The "Total Remake")
+          // Bypass Isar cache for UI updates to ensure 100% responsiveness
+          _room = updatedRoom;
+
+          if (_currentPlayer != null) {
+            _currentPlayer = updatedRoom.players.firstWhere(
+              (p) => p.id == _currentPlayer!.id,
+              orElse: () => _currentPlayer!,
+            );
+          }
+
+          if (newVersion > _lastNotifiedVersion ||
+              playersChanged ||
+              statusChanged ||
+              hasEvents) {
+            _lastNotifiedVersion = newVersion;
+
+            // Should also verify if WebRTC needs update
+            if (playersChanged) {
+              WebRTCService().onPlayersChanged(updatedRoom.players);
             }
-            if (newVersion > _lastNotifiedVersion ||
-                playersChanged ||
-                statusChanged ||
-                hasEvents) {
-              _lastNotifiedVersion = newVersion;
-              notifyListeners();
-            }
+
+            notifyListeners();
+          }
+
+          IsarService.writeRoomSnapshot(updatedRoom).ignore();
+
+          if (updatedRoom.status == RoomStatus.finished) {
+            Future.microtask(() async {
+              await IsarService.clearRoomData(updatedRoom.code);
+            });
           }
         }
       }

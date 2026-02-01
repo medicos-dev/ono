@@ -96,119 +96,115 @@ export default {
 };
 
 async function handleCreateRoom(request: Request, env: Env): Promise<Response> {
-  const body = await request.json() as { playerName: string; playerId: string; roomCode?: string };
-  const { playerName, playerId, roomCode: requestedRoomCode } = body;
+  try {
+    const body = await request.json() as { playerName: string; playerId: string; roomCode?: string };
+    const { playerName, playerId, roomCode: requestedRoomCode } = body;
 
-  if (!playerName || !playerId) {
-    return new Response(JSON.stringify({ error: 'Missing playerName or playerId' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+    if (!playerName || !playerId) {
+      return new Response(JSON.stringify({ error: 'Missing playerName or playerId' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-  // Validate and use provided room code (must be provided and not empty)
-  if (!requestedRoomCode || requestedRoomCode.trim().length === 0) {
-    return new Response(JSON.stringify({ error: 'Room code is required' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+    if (!requestedRoomCode || requestedRoomCode.trim().length === 0) {
+      return new Response(JSON.stringify({ error: 'Room code is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-  const roomCode = requestedRoomCode.trim().toUpperCase();
+    const roomCode = requestedRoomCode.trim().toUpperCase();
 
-  // Validate room code format (alphanumeric, 3-10 characters)
-  if (!/^[A-Z0-9]{3,10}$/.test(roomCode)) {
-    return new Response(JSON.stringify({ error: 'Room code must be 3-10 alphanumeric characters' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+    if (!/^[A-Z0-9]{3,10}$/.test(roomCode)) {
+      return new Response(JSON.stringify({ error: 'Room code must be 3-10 alphanumeric characters' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-  // Check if room already exists
-  const existingRoom = await env.DB.prepare('SELECT * FROM rooms WHERE code = ?')
-    .bind(roomCode)
-    .first();
+    const existingRow = await env.DB.prepare('SELECT code FROM rooms WHERE code = ?')
+      .bind(roomCode)
+      .first<{ code: string }>();
 
-  if (existingRoom) {
-    return new Response(JSON.stringify({ error: 'Room code already exists. Please choose a different code.' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-  const now = new Date().toISOString();
+    if (existingRow) {
+      return new Response(JSON.stringify({ error: 'Room code already exists. Please choose a different code.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
+    const now = new Date().toISOString();
+    const gameState: GameState = {
+      drawPile: [],
+      discardPile: [],
+      activeColor: CardColor.red,
+      currentTurnPlayerId: null,
+      direction: 1,
+      pendingDrawCount: 0,
+      lastPlayedCardJson: null,
+      pendingWildColorChoice: null,
+      unoCalled: {},
+      stateVersion: 0,
+      lastActivity: now,
+    };
 
-  const gameState: GameState = {
-    drawPile: [],
-    discardPile: [],
-    activeColor: CardColor.red,
-    currentTurnPlayerId: null,
-    direction: 1,
-    pendingDrawCount: 0,
-    lastPlayedCardJson: null,
-    pendingWildColorChoice: null,
-    unoCalled: {},
-    stateVersion: 0,
-    lastActivity: now,
-  };
-
-  const player: Player = {
-    id: playerId,
-    name: playerName,
-    roomCode,
-    isHost: true,
-    hand: [],
-    lastSeen: now,
-  };
-
-  await env.DB.prepare(
-    `INSERT INTO rooms (code, host_id, status, game_state_json, current_turn_player_id, direction, active_color, pending_draw_count, state_version, last_activity)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
-      roomCode,
-      playerId,
-      RoomStatus.lobby,
-      JSON.stringify(gameState),
-      null,
-      1,
-      CardColor.red,
-      0,
-      0,
-      now,
+    await env.DB.prepare(
+      `INSERT INTO rooms (code, host_id, status, game_state_json, current_turn_player_id, direction, active_color, pending_draw_count, state_version, last_activity)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run();
+      .bind(
+        roomCode,
+        playerId,
+        RoomStatus.lobby,
+        JSON.stringify(gameState),
+        null,
+        1,
+        CardColor.red,
+        0,
+        0,
+        now,
+      )
+      .run();
 
-  await env.DB.prepare(
-    `INSERT INTO players (id, room_code, name, is_host, seat_number, hand_json, card_count, last_seen)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
-      playerId,
-      roomCode,
-      playerName,
-      true,
-      1,
-      JSON.stringify([]),
-      0,
-      now,
+    await env.DB.prepare(
+      `INSERT INTO players (id, room_code, name, is_host, seat_number, hand_json, card_count, last_seen)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run();
+      .bind(
+        playerId,
+        roomCode,
+        playerName,
+        true,
+        1,
+        JSON.stringify([]),
+        0,
+        now,
+      )
+      .run();
 
-  const room = await getRoomWithPlayers(roomCode, env);
-  if (!room) {
-    return new Response(JSON.stringify({
-      type: 'ROOM_DELETED',
-      reason: 'NOT_FOUND',
-      events: [createEvent(GameEventType.ROOM_DELETED, playerId, { reason: 'NOT_FOUND' })],
-    }), {
+    const room = await getRoomWithPlayers(roomCode, env);
+    if (!room) {
+      return new Response(JSON.stringify({
+        type: 'ROOM_DELETED',
+        reason: 'NOT_FOUND',
+        events: [createEvent(GameEventType.ROOM_DELETED, playerId, { reason: 'NOT_FOUND' })],
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify(room), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: 'Failed to create room' }), {
+      status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
   }
-
-  return new Response(JSON.stringify(room), {
-    headers: { 'Content-Type': 'application/json' },
-  });
 }
 
 async function handleJoinRoom(request: Request, env: Env): Promise<Response> {
@@ -507,27 +503,8 @@ async function handleStartGame(request: Request, env: Env): Promise<Response> {
   }
 
   const hostPlayer = activePlayers[0];
-  const hostHand = hands[0];
+  const playerIdsOrdered = await getPlayerIds(roomCode.toUpperCase(), env);
 
-  if (hostHand.length === 0) {
-    return new Response(JSON.stringify({ error: 'Host has no cards' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  const firstCard = hostHand[0];
-  hostHand.shift();
-
-  await env.DB.prepare('UPDATE players SET hand_json = ?, card_count = ? WHERE id = ?')
-    .bind(
-      JSON.stringify(hostHand),
-      hostHand.length,
-      hostPlayer.id,
-    )
-    .run();
-
-  const playerIds = activePlayers.map(p => p.id);
   const initialGameState: GameState = {
     drawPile: deck,
     discardPile: [],
@@ -545,30 +522,19 @@ async function handleStartGame(request: Request, env: Env): Promise<Response> {
     lastPlayedCardAnimationId: null,
   };
 
-  const playerIdsOrdered = await getPlayerIds(roomCode.toUpperCase(), env);
-
-  const chosenColor = firstCard.isWild ? CardColor.red : undefined;
-  const gameState = processCardPlay(
-    initialGameState,
-    firstCard,
-    chosenColor,
-    hostPlayer.id,
-    playerIdsOrdered,
-  );
-
   await env.DB.prepare(
     `UPDATE rooms SET status = ?, game_state_json = ?, current_turn_player_id = ?, direction = ?, active_color = ?, pending_draw_count = ?, state_version = ?, last_activity = ?
      WHERE code = ?`
   )
     .bind(
       RoomStatus.playing,
-      JSON.stringify(gameState),
-      gameState.currentTurnPlayerId,
-      gameState.direction,
-      gameState.activeColor,
-      gameState.pendingDrawCount,
-      gameState.stateVersion,
-      gameState.lastActivity,
+      JSON.stringify(initialGameState),
+      initialGameState.currentTurnPlayerId,
+      initialGameState.direction,
+      initialGameState.activeColor,
+      initialGameState.pendingDrawCount,
+      initialGameState.stateVersion,
+      initialGameState.lastActivity,
       roomCode.toUpperCase(),
     )
     .run();
@@ -655,9 +621,11 @@ async function handlePlayCard(request: Request, env: Env): Promise<Response> {
     });
   }
 
-  const topCard = gameState.discardPile[gameState.discardPile.length - 1];
+  const topCard = gameState.discardPile.length > 0
+    ? gameState.discardPile[gameState.discardPile.length - 1]
+    : null;
 
-  if (!canPlayCard(card, topCard, gameState.activeColor, gameState.pendingDrawCount, hand)) {
+  if (topCard != null && !canPlayCard(card, topCard, gameState.activeColor, gameState.pendingDrawCount, hand)) {
     return new Response(JSON.stringify({ error: 'Invalid card' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -673,13 +641,25 @@ async function handlePlayCard(request: Request, env: Env): Promise<Response> {
 
   hand.splice(cardIndex, 1);
 
-  const updatedGameState = processCardPlay(
+  let updatedGameState = processCardPlay(
     gameState,
     card,
     chosenColor as CardColor | undefined,
     playerId,
     await getPlayerIds(roomCode.toUpperCase(), env),
   );
+
+  if (updatedGameState.discardPile.length > 6) {
+    const pile = updatedGameState.discardPile;
+    const lastCard = pile[pile.length - 1];
+    const toRecycle = pile.slice(0, -1);
+    const newDrawPile = shuffleDeck([...updatedGameState.drawPile, ...toRecycle]);
+    updatedGameState = {
+      ...updatedGameState,
+      drawPile: newDrawPile,
+      discardPile: [lastCard],
+    };
+  }
 
   let winnerDetected = false;
   let winnerPlayerId: string | null = null;

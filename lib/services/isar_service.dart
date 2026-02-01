@@ -26,6 +26,7 @@ class IsarService {
       isar_models.PlayerHandSchema,
       isar_models.GameEventSchema,
       isar_models.SyncMetadataSchema,
+      isar_models.ConsumedAnimationIdSchema,
     ], directory: dir.path);
   }
 
@@ -56,81 +57,77 @@ class IsarService {
 
   static Future<Room?> getCachedRoom(String roomCode) async {
     try {
-      final snapshot =
-          await instance.gameStateSnapshots
-              .filter()
-              .roomCodeEqualTo(roomCode)
-              .findFirst();
+      final snapshotFuture = instance.gameStateSnapshots
+          .filter()
+          .roomCodeEqualTo(roomCode)
+          .findFirst();
+      final playersFuture = instance.playerSnapshots
+          .filter()
+          .roomCodeEqualTo(roomCode)
+          .findAll();
+      final discardPileFuture = instance.discardPileCards
+          .filter()
+          .roomCodeEqualTo(roomCode)
+          .sortByCardIndex()
+          .findAll();
+      final handsFuture = instance.playerHands
+          .filter()
+          .roomCodeEqualTo(roomCode)
+          .findAll();
+
+      final results = await Future.wait([
+        snapshotFuture,
+        playersFuture,
+        discardPileFuture,
+        handsFuture,
+      ]);
+      final snapshot = results[0] as isar_models.GameStateSnapshot?;
+      final players = results[1] as List<isar_models.PlayerSnapshot>;
+      final discardPile = results[2] as List<isar_models.DiscardPileCard>;
+      final hands = results[3] as List<isar_models.PlayerHand>;
 
       if (snapshot == null) return null;
 
-      final players =
-          await instance.playerSnapshots
-              .filter()
-              .roomCodeEqualTo(roomCode)
-              .findAll();
+      final handByPlayerId = <String, isar_models.PlayerHand>{
+        for (final h in hands) h.playerId: h,
+      };
 
-      final discardPile =
-          await instance.discardPileCards
-              .filter()
-              .roomCodeEqualTo(roomCode)
-              .sortByCardIndex()
-              .findAll();
-
-      final hands =
-          await instance.playerHands
-              .filter()
-              .roomCodeEqualTo(roomCode)
-              .findAll();
-
-      final discardCards =
-          discardPile
-              .map((dp) {
-                try {
-                  return UnoCard(
-                    color: CardColor.values.firstWhere(
-                      (e) => e.name == dp.color,
-                      orElse: () => CardColor.wild,
-                    ),
-                    type: CardType.values.firstWhere(
-                      (e) => e.name == dp.type,
-                      orElse: () => CardType.number,
-                    ),
-                    number: dp.number,
-                  );
-                } catch (_) {
-                  return null;
-                }
-              })
-              .whereType<UnoCard>()
-              .toList();
+      final discardCards = discardPile
+          .map((dp) {
+            try {
+              return UnoCard(
+                color: CardColor.values.firstWhere(
+                  (e) => e.name == dp.color,
+                  orElse: () => CardColor.wild,
+                ),
+                type: CardType.values.firstWhere(
+                  (e) => e.name == dp.type,
+                  orElse: () => CardType.number,
+                ),
+                number: dp.number,
+              );
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<UnoCard>()
+          .toList();
 
       final playerList = <Player>[];
       for (final ps in players) {
-        final handData = hands.firstWhere(
-          (h) => h.playerId == ps.playerId,
-          orElse:
-              () =>
-                  isar_models.PlayerHand()
-                    ..playerId = ps.playerId
-                    ..roomCode = roomCode
-                    ..cardData = []
-                    ..lastUpdated = DateTime.now(),
-        );
-
-        final hand =
-            handData.cardData
-                .map((cardJson) {
-                  try {
-                    final cardMap =
-                        jsonDecode(cardJson) as Map<String, dynamic>;
-                    return UnoCard.fromJson(cardMap);
-                  } catch (_) {
-                    return null;
-                  }
-                })
-                .whereType<UnoCard>()
-                .toList();
+        final handData = handByPlayerId[ps.playerId];
+        final rawHand = handData?.cardData ?? [];
+        final hand = rawHand
+            .map((cardJson) {
+              try {
+                final cardMap = jsonDecode(cardJson) as Map<String, dynamic>;
+                return UnoCard.fromJson(cardMap);
+              } catch (_) {
+                return null;
+              }
+            })
+            .whereType<UnoCard>()
+            .toList();
 
         playerList.add(
           Player(
@@ -213,25 +210,23 @@ class IsarService {
         }
       }
 
-      final metadata =
-          await instance.syncMetadatas
-              .filter()
-              .roomCodeEqualTo(room.code)
-              .findFirst();
-
-      final currentVersion = metadata?.lastAppliedStateVersion ?? 0;
       final incomingVersion = room.stateVersion;
-
-      // Control events bypass version checks, but regular updates don't
       final hasControlEvents =
           room.events?.any((e) => e.isControlEvent) ?? false;
-      if (incomingVersion < currentVersion &&
-          !isOptimistic &&
-          !hasControlEvents) {
-        return false;
-      }
 
+      var didWrite = false;
       await instance.writeTxn(() async {
+        final metadata = await instance.syncMetadatas
+            .filter()
+            .roomCodeEqualTo(room.code)
+            .findFirst();
+        final currentVersion = metadata?.lastAppliedStateVersion ?? 0;
+        if (incomingVersion < currentVersion &&
+            !isOptimistic &&
+            !hasControlEvents) {
+          return;
+        }
+        didWrite = true;
         final snapshot =
             isar_models.GameStateSnapshot()
               ..roomCode = room.code
@@ -305,11 +300,17 @@ class IsarService {
         await instance.syncMetadatas.put(syncMeta);
       });
 
-      final cachedRoom = await getCachedRoom(room.code);
-      if (cachedRoom != null && _roomStreams.containsKey(room.code)) {
-        _roomStreams[room.code]!.add(cachedRoom);
-      }
+      if (!didWrite) return false;
 
+      final roomCodeForStream = room.code;
+      scheduleMicrotask(() async {
+        final cachedRoom = await getCachedRoom(roomCodeForStream);
+        if (cachedRoom != null &&
+            _roomStreams.containsKey(roomCodeForStream) &&
+            !_roomStreams[roomCodeForStream]!.isClosed) {
+          _roomStreams[roomCodeForStream]!.add(cachedRoom);
+        }
+      });
       return true;
     } catch (e) {
       return false;
@@ -409,7 +410,41 @@ class IsarService {
             .filter()
             .roomCodeEqualTo(roomCode)
             .deleteAll();
+        await instance.consumedAnimationIds
+            .filter()
+            .roomCodeEqualTo(roomCode)
+            .deleteAll();
       });
+    } catch (e) {}
+  }
+
+  /// Returns true if this animation/event was already played (card fly, UNO, etc.).
+  static Future<bool> hasConsumedAnimation(
+    String roomCode,
+    String animationKey,
+  ) async {
+    try {
+      final existing = await instance.consumedAnimationIds
+          .filter()
+          .roomCodeEqualTo(roomCode)
+          .keyEqualTo(animationKey)
+          .findFirst();
+      return existing != null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Marks an animation as consumed so it never plays again for this room.
+  static Future<void> markAnimationConsumed(
+    String roomCode,
+    String animationKey,
+  ) async {
+    try {
+      final record = isar_models.ConsumedAnimationId()
+        ..roomCode = roomCode
+        ..key = animationKey;
+      await instance.consumedAnimationIds.put(record);
     } catch (e) {}
   }
 

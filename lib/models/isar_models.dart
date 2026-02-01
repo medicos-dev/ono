@@ -137,3 +137,15 @@ class SyncMetadata {
 
   late bool needsFullSync;
 }
+
+/// Tracks animation/event IDs already played so they never replay (card fly, UNO, wild, etc.).
+@collection
+class ConsumedAnimationId {
+  Id id = Isar.autoIncrement;
+
+  @Index(unique: true, replace: true)
+  late String key;
+
+  @Index()
+  late String roomCode;
+}

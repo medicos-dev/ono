@@ -43,7 +43,7 @@ class GameProvider with ChangeNotifier {
     if (_selectedCard == null) return false;
 
     final topCard = gameState!.topDiscardCard;
-    if (topCard == null) return false;
+    if (topCard == null) return true;
 
     return _selectedCard!.canPlayOn(topCard, gameState!.activeColor);
   }

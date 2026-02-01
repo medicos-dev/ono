@@ -17,6 +17,7 @@ import '../models/card.dart';
 import '../models/room.dart';
 import '../models/player.dart';
 import '../theme/app_theme.dart';
+import '../services/isar_service.dart';
 import 'home_screen.dart';
 import 'lobby_screen.dart';
 
@@ -31,13 +32,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final ScrollController _handScrollController = ScrollController();
   bool _showWildColorPicker = false;
   UnoCard? _pendingWildCard;
-  String? _lastUnoCallPlayerId;
   String? _lastProcessedAnimationId;
   String? _lastWinnerShown;
   final Map<String, GlobalKey> _playerAvatarKeys = {};
   final GlobalKey _discardPileKey = GlobalKey();
   bool _showWinnerOverlay = false;
   int _lastRenderedVersion = 0;
+  String? _pendingCardFlyId;
+  bool _cardFlyCheckInProgress = false;
+  final Set<String> _unoKeysHandled = {};
 
   @override
   void initState() {
@@ -129,15 +132,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     });
   }
 
-  void _showUnoOverlay(String playerName) {
-    if (_lastUnoCallPlayerId == playerName) return;
-    _lastUnoCallPlayerId = playerName;
-
+  void _showUnoOverlay(String playerName, String animationKey, String roomCode) {
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => UnoCallOverlay(playerName: playerName),
-    );
+    ).then((_) {
+      IsarService.markAnimationConsumed(roomCode, animationKey);
+    });
   }
 
   void _showDiscardPileHistory(GameState gameState) {
@@ -170,24 +172,45 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _handleWinner();
       }
 
-      if (gameState.lastPlayedCardAnimationId != null &&
-          gameState.lastPlayedCardAnimationId != _lastProcessedAnimationId) {
-        _lastProcessedAnimationId = gameState.lastPlayedCardAnimationId;
+      final cardFlyId = gameState.lastPlayedCardAnimationId;
+      if (cardFlyId != null &&
+          cardFlyId != _lastProcessedAnimationId &&
+          _pendingCardFlyId != cardFlyId &&
+          !_cardFlyCheckInProgress) {
+        _cardFlyCheckInProgress = true;
+        IsarService.hasConsumedAnimation(room!.code, cardFlyId).then((consumed) {
+          if (!mounted) return;
+          setState(() {
+            _cardFlyCheckInProgress = false;
+            if (consumed) {
+              _lastProcessedAnimationId = cardFlyId;
+            } else {
+              _pendingCardFlyId = cardFlyId;
+            }
+          });
+        });
       }
 
       final unoCalls = gameState.unoCalled;
+      final roomCode = room!.code;
+      final stateVersion = gameState.stateVersion;
       for (final entry in unoCalls.entries) {
-        if (entry.value == true) {
-          final player = room!.players.firstWhere(
-            (p) => p.id == entry.key,
-            orElse: () => room.players.first,
-          );
+        if (entry.value != true) continue;
+        final playerId = entry.key;
+        final animationKey = 'uno_${playerId}_$stateVersion';
+        if (_unoKeysHandled.contains(animationKey)) continue;
+        _unoKeysHandled.add(animationKey);
+        final player = room.players.firstWhere(
+          (p) => p.id == playerId,
+          orElse: () => room.players.first,
+        );
+        IsarService.hasConsumedAnimation(roomCode, animationKey).then((consumed) {
+          if (!mounted) return;
+          if (consumed) return;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _showUnoOverlay(player.name);
-            }
+            if (mounted) _showUnoOverlay(player.name, animationKey, roomCode);
           });
-        }
+        });
       }
     }
   }
@@ -581,9 +604,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 if (_showWildColorPicker) _buildWildColorPicker(),
-                if (gameState.lastPlayedCardAnimationId != null &&
-                    gameState.lastPlayedCardAnimationId !=
-                        _lastProcessedAnimationId)
+                if (_pendingCardFlyId != null &&
+                    _pendingCardFlyId == gameState.lastPlayedCardAnimationId)
                   ...(_buildCardFlyAnimation(room, gameState) != null
                       ? [_buildCardFlyAnimation(room, gameState)!]
                       : []),
@@ -1118,12 +1140,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Widget? _buildCardFlyAnimation(Room room, GameState gameState) {
-    if (gameState.lastPlayedCardAnimationId == null ||
-        gameState.lastPlayedCardAnimationId == _lastProcessedAnimationId) {
-      return null;
-    }
+    final animationId = _pendingCardFlyId ?? gameState.lastPlayedCardAnimationId;
+    if (animationId == null) return null;
 
-    final parts = gameState.lastPlayedCardAnimationId!.split('|');
+    final parts = animationId.split('|');
     if (parts.length < 2) return null;
 
     final playerId = parts[0];
@@ -1148,9 +1168,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       endPosition: endPos,
       duration: const Duration(milliseconds: 600),
       onComplete: () {
+        IsarService.markAnimationConsumed(room.code, animationId);
         if (mounted) {
           setState(() {
-            _lastProcessedAnimationId = gameState.lastPlayedCardAnimationId;
+            _lastProcessedAnimationId = animationId;
+            _pendingCardFlyId = null;
           });
         }
       },

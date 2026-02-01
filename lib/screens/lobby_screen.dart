@@ -1,9 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/room_provider.dart';
 import '../services/webrtc_service.dart';
 import '../widgets/app_toast.dart';
 import '../theme/app_theme.dart';
+import '../models/room.dart';
 import 'home_screen.dart';
 import 'game_screen.dart';
 
@@ -16,6 +18,7 @@ class LobbyScreen extends StatefulWidget {
 
 class _LobbyScreenState extends State<LobbyScreen> {
   bool _isMicPressed = false;
+  final Set<String> _shownEventIds = {};
 
   @override
   void initState() {
@@ -151,27 +154,31 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Apple Responsive System
     final size = MediaQuery.of(context).size;
-    final verticalUnit = size.height * 0.02;
+    final w = size.width;
+    final h = size.height;
+
+    // Apple UI Constants
+    final double headerHeight = h * 0.15;
+    final double bottomBarHeight = h * 0.12;
 
     return Consumer<RoomProvider>(
       builder: (context, roomProvider, _) {
-        // Auto-navigate to game screen when game starts and gameState is ready
+        // Auto-navigate logic (Keep existing)
         if (roomProvider.isPlaying && roomProvider.room?.gameState != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
+            if (mounted)
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const GameScreen()),
               );
-            }
           });
         }
-
         if (roomProvider.room == null || roomProvider.currentPlayer == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(builder: (_) => const HomeScreen()),
-              (route) => false,
+              (r) => false,
             );
           });
         }
@@ -179,195 +186,193 @@ class _LobbyScreenState extends State<LobbyScreen> {
         final room = roomProvider.room;
         final currentPlayer = roomProvider.currentPlayer;
 
+        if (room != null && room.events != null) {
+          for (final e in room.events!) {
+            if (e.type == GameEventType.hostChanged && !_shownEventIds.contains(e.eventId)) {
+              _shownEventIds.add(e.eventId);
+              final newHostName = e.data?['newHostName'] as String?;
+              if (mounted) {
+                AppToast.show(
+                  context,
+                  newHostName != null ? '$newHostName is now the host.' : 'Host has been changed.',
+                  type: AppToastType.info,
+                );
+              }
+            }
+          }
+        }
+
         if (room == null || currentPlayer == null) {
           return const Scaffold(
+            backgroundColor: Color(0xFF0A0A0F),
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('Room: ${room.code}'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.exit_to_app),
-                onPressed: _handleLeaveRoom,
-                tooltip: 'Leave Room',
-              ),
-            ],
-          ),
-          body: Container(
-            decoration: const BoxDecoration(color: AppTheme.darkBackground),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.all(size.width * 0.04),
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+        return PopScope(
+          canPop: false,
+          child: Scaffold(
+            backgroundColor: const Color(0xFF0A0A0F),
+            body: Stack(
+            children: [
+              // Ambient Background (Consistent with Home)
+              Positioned(
+                top: -h * 0.1,
+                right: -w * 0.2,
+                child: Container(
+                  width: w * 0.6,
+                  height: w * 0.6,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00E5FF).withOpacity(0.08),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 100,
+                        color: const Color(0xFF00E5FF).withOpacity(0.08),
                       ),
-                      elevation: 6,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Room Code',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  room.code,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.displaySmall?.copyWith(
-                                    color: AppTheme.neonBlue,
-                                    letterSpacing: 4,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.darkSurface,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    '${room.players.length} player${room.players.length == 1 ? '' : 's'}',
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                    ],
+                  ),
+                ),
+              ),
+
+              CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  // iOS Large Title Header
+                  SliverAppBar(
+                    expandedHeight: headerHeight,
+                    backgroundColor: const Color(0xFF0A0A0F).withOpacity(0.9),
+                    floating: false,
+                    pinned: true,
+                    elevation: 0,
+                    automaticallyImplyLeading: false,
+                    leading: const SizedBox.shrink(),
+                    flexibleSpace: FlexibleSpaceBar(
+                      titlePadding: EdgeInsets.only(left: w * 0.05, bottom: 16),
+                      title: Text(
+                        room.code,
+                        style: TextStyle(
+                          fontFamily: 'SourGummy',
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2,
+                          color: Colors.white,
+                          fontSize: h * 0.035,
+                        ), // Scales with device
+                      ),
+                      background: Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: w * 0.05,
+                            top: h * 0.05,
+                          ),
+                          child: Icon(
+                            Icons.tag,
+                            color: Colors.white.withOpacity(0.1),
+                            size: h * 0.1,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: size.width * 0.04,
-                        vertical: verticalUnit * 0.4,
-                      ),
-                      itemCount: room.players.length,
-                      itemBuilder: (context, index) {
-                        final player = room.players[index];
-                        final isHost = player.isHost;
-                        return Container(
-                          margin: EdgeInsets.only(bottom: verticalUnit * 0.6),
+                    actions: [
+                      PopupMenuButton<String>(
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppTheme.darkSurface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color:
-                                  isHost
-                                      ? AppTheme.neonYellow.withOpacity(0.7)
-                                      : Colors.white.withOpacity(0.06),
-                              width: isHost ? 1.5 : 1,
-                            ),
+                            color: Colors.white.withOpacity(0.1),
+                            shape: BoxShape.circle,
                           ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            leading: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color:
-                                    isHost
-                                        ? AppTheme.neonYellow.withOpacity(0.18)
-                                        : Colors.white.withOpacity(0.06),
-                                border: Border.all(
-                                  color:
-                                      isHost
-                                          ? AppTheme.neonYellow
-                                          : AppTheme.neonBlue.withOpacity(0.6),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  player.name.isNotEmpty
-                                      ? player.name[0].toUpperCase()
-                                      : '?',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                          child: const Icon(
+                            Icons.more_horiz_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        color: const Color(0xFF1A1A24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        itemBuilder:
+                            (context) => [
+                              if (roomProvider.isHost)
+                                const PopupMenuItem(
+                                  value: 'resign',
+                                  child: Text(
+                                    'Resign Host',
+                                    style: TextStyle(color: Colors.white),
                                   ),
                                 ),
+                              const PopupMenuItem(
+                                value: 'leave',
+                                child: Text(
+                                  'Leave Room',
+                                  style: TextStyle(color: Color(0xFFFF2D55)),
+                                ),
                               ),
-                            ),
-                            title: Text(
-                              player.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle:
-                                isHost
-                                    ? Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.neonYellow
-                                              .withOpacity(0.9),
-                                          borderRadius: BorderRadius.circular(
-                                            999,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'HOST',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                    : null,
-                            trailing:
-                                isHost
-                                    ? Icon(
-                                      Icons.star_rounded,
-                                      color: AppTheme.neonYellow,
-                                      size: 22,
-                                    )
-                                    : null,
+                            ],
+                        onSelected: (val) {
+                          if (val == 'resign') _handleResignHost();
+                          if (val == 'leave') _handleLeaveRoom();
+                        },
+                      ),
+                      SizedBox(width: w * 0.04),
+                    ],
+                  ),
+
+                  // Player List
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      w * 0.04,
+                      h * 0.02,
+                      w * 0.04,
+                      bottomBarHeight,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final player = room.players[index];
+                        final isMe = player.id == currentPlayer.id;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildGlassPlayerTile(
+                            context,
+                            player,
+                            isMe,
+                            w,
+                            h,
                           ),
                         );
-                      },
+                      }, childCount: room.players.length),
                     ),
                   ),
-                  Padding(
-                    padding: EdgeInsets.all(size.width * 0.04),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
+                ],
+              ),
+
+              // Frosted Glass Bottom Action Bar (above system nav)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      child: Container(
+                        height: bottomBarHeight,
+                        padding: EdgeInsets.symmetric(
+                        horizontal: w * 0.05,
+                        vertical: h * 0.02,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF15151A).withOpacity(0.85),
+                        border: Border(
+                          top: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          // Mic Button
+                          GestureDetector(
                             onTapDown: (_) async {
                               setState(() => _isMicPressed = true);
                               await WebRTCService().toggleMic(true);
@@ -380,56 +385,225 @@ class _LobbyScreenState extends State<LobbyScreen> {
                               setState(() => _isMicPressed = false);
                               await WebRTCService().toggleMic(false);
                             },
-                            child: Container(
-                              height: 60,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 100),
+                              width: bottomBarHeight * 0.6,
+                              height: bottomBarHeight * 0.6,
                               decoration: BoxDecoration(
+                                shape: BoxShape.circle,
                                 color:
                                     _isMicPressed
                                         ? AppTheme.neonRed
-                                        : AppTheme.neonBlue,
-                                shape: BoxShape.circle,
+                                        : Colors.white.withOpacity(0.1),
+                                boxShadow:
+                                    _isMicPressed
+                                        ? [
+                                          BoxShadow(
+                                            color: AppTheme.neonRed.withOpacity(
+                                              0.5,
+                                            ),
+                                            blurRadius: 15,
+                                          ),
+                                        ]
+                                        : [],
                               ),
                               child: Icon(
                                 _isMicPressed ? Icons.mic : Icons.mic_none,
                                 color: Colors.white,
-                                size: 26,
+                                size: bottomBarHeight * 0.3,
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        if (roomProvider.isHost) ...[
-                          if (room.players.length >= 2)
-                            Expanded(
-                              flex: 2,
-                              child: ElevatedButton(
-                                onPressed: _handleStartGame,
-                                child: const Text('START GAME'),
-                              ),
-                            ),
-                          if (room.players.length < 2)
-                            Expanded(
-                              flex: 2,
-                              child: ElevatedButton(
-                                onPressed: null,
-                                child: const Text('Need 2+ Players'),
-                              ),
-                            ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: _handleResignHost,
-                            child: const Text('RESIGN'),
+                          SizedBox(width: w * 0.04),
+
+                          // Action Button
+                          Expanded(
+                            child:
+                                roomProvider.isHost
+                                    ? ElevatedButton(
+                                      onPressed:
+                                          (room.players.length >= 2)
+                                              ? _handleStartGame
+                                              : null,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFF00E5FF,
+                                        ),
+                                        foregroundColor: Colors.black,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 16,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                        disabledBackgroundColor: Colors.white
+                                            .withOpacity(0.1),
+                                      ),
+                                      child: Text(
+                                        room.players.length < 2
+                                            ? 'WAITING FOR PLAYERS...'
+                                            : 'START GAME',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    )
+                                    : Container(
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: Colors.white.withOpacity(0.1),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'WAITING FOR HOST...',
+                                        style: TextStyle(
+                                          color: Colors.white.withOpacity(0.5),
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 2,
+                                        ),
+                                      ),
+                                    ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ],
+                ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlassPlayerTile(
+    BuildContext context,
+    dynamic player,
+    bool isMe,
+    double w,
+    double h,
+  ) {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: h * 0.02, horizontal: w * 0.04),
+      decoration: BoxDecoration(
+        color:
+            isMe
+                ? const Color(0xFF00E5FF).withOpacity(0.05)
+                : Colors.white.withOpacity(0.02),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color:
+              player.isHost
+                  ? AppTheme.neonYellow.withOpacity(0.5)
+                  : (isMe
+                      ? const Color(0xFF00E5FF).withOpacity(0.3)
+                      : Colors.white.withOpacity(0.05)),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Avatar
+          Container(
+            width: w * 0.12,
+            height: w * 0.12,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color:
+                  player.isHost
+                      ? AppTheme.neonYellow.withOpacity(0.1)
+                      : Colors.white.withOpacity(0.05),
+              border: Border.all(
+                color:
+                    player.isHost
+                        ? AppTheme.neonYellow
+                        : Colors.white.withOpacity(0.1),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                player.name.isNotEmpty ? player.name[0].toUpperCase() : '?',
+                style: TextStyle(
+                  color: player.isHost ? AppTheme.neonYellow : Colors.white,
+                  fontSize: w * 0.05,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
-        );
-      },
+          SizedBox(width: w * 0.04),
+
+          // Info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      player.name,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: h * 0.022,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (isMe) ...[
+                      SizedBox(width: 8),
+                      Icon(
+                        Icons.person,
+                        size: 14,
+                        color: const Color(0xFF00E5FF),
+                      ),
+                    ],
+                  ],
+                ),
+                if (player.isHost)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'HOST',
+                      style: TextStyle(
+                        color: AppTheme.neonYellow,
+                        fontSize: h * 0.012,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Status Indicator
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF4CAF50),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4CAF50).withOpacity(0.5),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
