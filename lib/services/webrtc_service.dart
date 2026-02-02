@@ -31,6 +31,12 @@ class WebRTCService {
   Stream<bool> get micStateStream => _micStateController.stream;
   bool get isMicrophoneOn => !_isMicMuted;
 
+  /// WebRTCService owns its own ApiService instance, so it must be configured
+  /// with the same API base URL used by the rest of the app.
+  void configureApiBaseUrl(String url) {
+    _apiService.initialize(url);
+  }
+
   // Track candidates received before remote description is set
   final Map<String, List<RTCIceCandidate>> _pendingCandidates = {};
 
@@ -152,19 +158,19 @@ class WebRTCService {
     // Send candidates to signaling backend
     pc.onIceCandidate = (candidate) {
       if (candidate.candidate != null) {
-        _apiService
-            .sendRTCSignal(
-              roomCode: _currentRoomCode!,
-              fromPlayerId: _myPlayerId!,
-              toPlayerId: remoteId,
-              signalType: 'candidate',
-              signalData: jsonEncode({
-                'candidate': candidate.candidate,
-                'sdpMid': candidate.sdpMid,
-                'sdpMLineIndex': candidate.sdpMLineIndex,
-              }),
-            )
-            .catchError((e) {});
+        try {
+          _apiService.sendRTCSignal(
+            roomCode: _currentRoomCode!,
+            fromPlayerId: _myPlayerId!,
+            toPlayerId: remoteId,
+            signalType: 'candidate',
+            signalData: jsonEncode({
+              'candidate': candidate.candidate,
+              'sdpMid': candidate.sdpMid,
+              'sdpMLineIndex': candidate.sdpMLineIndex,
+            }),
+          );
+        } catch (_) {}
       }
     };
 

@@ -244,6 +244,7 @@ class RoomProvider with ChangeNotifier {
 
   Future<void> initializeApi(String url) async {
     _apiService.initialize(url);
+    WebRTCService().configureApiBaseUrl(url);
 
     final savedRoomCode = await StorageService.getRoomCode();
     if (savedRoomCode != null && savedRoomCode.isNotEmpty) {
