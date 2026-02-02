@@ -502,7 +502,8 @@ async function handleStartGame(request: Request, env: Env): Promise<Response> {
       .run();
   }
 
-  const hostPlayer = activePlayers[0];
+  const hostId = roomData.host_id;
+  const hostPlayer = activePlayers.find(p => p.id === hostId) ?? activePlayers[0];
   const playerIdsOrdered = await getPlayerIds(roomCode.toUpperCase(), env);
 
   const newStateVersion = roomData.state_version + 1;
