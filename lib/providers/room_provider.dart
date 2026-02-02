@@ -43,6 +43,7 @@ class RoomProvider with ChangeNotifier {
   }
 
   final ApiService _apiService = ApiService();
+  String? get apiBaseUrl => _apiService.baseUrl;
 
   Future<void> createRoom(
     String playerName,

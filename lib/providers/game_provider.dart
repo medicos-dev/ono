@@ -20,6 +20,14 @@ class GameProvider with ChangeNotifier {
 
   GameProvider(this.roomProvider);
 
+  void _ensureApiInitialized() {
+    if (_apiService.baseUrl != null && _apiService.baseUrl!.isNotEmpty) return;
+    final url = roomProvider.apiBaseUrl;
+    if (url != null && url.isNotEmpty) {
+      _apiService.initialize(url);
+    }
+  }
+
   bool get isMicOn => _isMicOn;
 
   bool get isProcessingAction => _isProcessingAction;
@@ -108,6 +116,7 @@ class GameProvider with ChangeNotifier {
   Future<void> playCard(UnoCard card, {CardColor? chosenColor}) async {
     if (_isProcessingAction || !isMyTurn) return;
     if (room == null || currentPlayer == null) return;
+    _ensureApiInitialized();
 
     final eventId =
         '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
@@ -185,6 +194,7 @@ class GameProvider with ChangeNotifier {
   Future<void> drawCard() async {
     if (_isProcessingAction || !isMyTurn) return;
     if (room == null || currentPlayer == null) return;
+    _ensureApiInitialized();
 
     final eventId =
         '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
@@ -227,6 +237,7 @@ class GameProvider with ChangeNotifier {
   Future<void> callUno() async {
     if (_isProcessingAction || !canCallUno) return;
     if (room == null || currentPlayer == null) return;
+    _ensureApiInitialized();
 
     final eventId =
         '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
@@ -268,6 +279,7 @@ class GameProvider with ChangeNotifier {
   Future<void> passTurn() async {
     if (_isProcessingAction || !isMyTurn) return;
     if (room == null || currentPlayer == null) return;
+    _ensureApiInitialized();
 
     final eventId =
         '${currentPlayer!.id}_${DateTime.now().millisecondsSinceEpoch}';
@@ -316,5 +328,24 @@ class GameProvider with ChangeNotifier {
     await WebRTCService().toggleMic(isOn);
     _isMicOn = isOn;
     notifyListeners();
+  }
+
+  bool canPlaySpecificCard(UnoCard card) {
+    if (!isMyTurn || _isProcessingAction) return false;
+    if (gameState == null || currentPlayer == null) return false;
+
+    // If there's a pending draw, only allow valid stacking cards.
+    if (gameState!.pendingDrawCount > 0) {
+      if (gameState!.pendingDrawCount >= 8) {
+        return card.type == CardType.wildDrawFour;
+      }
+      return card.type == CardType.drawTwo &&
+          card.color == gameState!.activeColor;
+    }
+
+    final topCard = gameState!.topDiscardCard;
+    if (topCard == null) return true; // first move: any card allowed
+
+    return card.canPlayOn(topCard, gameState!.activeColor);
   }
 }

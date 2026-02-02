@@ -19,6 +19,7 @@ class LobbyScreen extends StatefulWidget {
 class _LobbyScreenState extends State<LobbyScreen> {
   bool _isMicPressed = false;
   final Set<String> _shownEventIds = {};
+  bool _didNavigate = false;
 
   @override
   void initState() {
@@ -30,10 +31,11 @@ class _LobbyScreenState extends State<LobbyScreen> {
 
   void _checkRoomStatus() {
     final roomProvider = Provider.of<RoomProvider>(context, listen: false);
-    if (roomProvider.isPlaying) {
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const GameScreen()));
+    if (roomProvider.isPlaying && !_didNavigate) {
+      _didNavigate = true;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const GameScreen()),
+      );
       return;
     }
 
@@ -166,12 +168,16 @@ class _LobbyScreenState extends State<LobbyScreen> {
     return Consumer<RoomProvider>(
       builder: (context, roomProvider, _) {
         // Auto-navigate logic (Keep existing)
-        if (roomProvider.isPlaying && roomProvider.room?.gameState != null) {
+        if (!_didNavigate &&
+            roomProvider.isPlaying &&
+            roomProvider.room?.gameState != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted)
+            if (mounted && !_didNavigate) {
+              _didNavigate = true;
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const GameScreen()),
               );
+            }
           });
         }
         if (roomProvider.room == null || roomProvider.currentPlayer == null) {

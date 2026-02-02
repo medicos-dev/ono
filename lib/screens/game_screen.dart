@@ -1358,9 +1358,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 final card = hand[index];
                 final isSelected = gameProvider.selectedCard == card;
                 final isPlayable =
-                    isMyTurn &&
-                    topCard != null &&
-                    card.canPlayOn(topCard, gameState.activeColor);
+                    isMyTurn && gameProvider.canPlaySpecificCard(card);
 
                 return GestureDetector(
                   onTap:
